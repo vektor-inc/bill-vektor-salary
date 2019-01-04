@@ -1,0 +1,27 @@
+{
+	"name": "BillVektor Receipt",
+	"version": "1.0.0",
+	"download_url": "https://lightning.nagoya/wp-content/vk-data-files/bill-vektor-receipt-49308514/bill-vektor-receipt.zip",
+
+	"homepage": "https://lightning.nagoya/ja/",
+	"requires": "4.5",
+	"tested": "4.9.8",
+	"last_updated": "2018-09-29 16:17:00",
+	"upgrade_notice": "Here's why you should upgrade...",
+
+	"author": "Vektor,Inc.",
+	"author_homepage": "https://www.vektor-inc.co.jp",
+
+	"sections": {
+		"description": "This plugin is an extended design skin for WordPress theme Lightning.",
+		"installation": "",
+		"changelog": "<h4>1.0.0</h4><ul><li>初期リリース</li></ul>",
+		"custom_section": ""
+	},
+
+	"rating": 90,
+	"num_ratings": 10,
+
+	"downloaded": 1234,
+	"active_installs": 1000000
+}
