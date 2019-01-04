@@ -25,21 +25,22 @@
 // Your code starts here.
 require_once( 'inc/duplicate-doc.php' );
 require_once( 'inc/staff/staff.php' );
+require_once( 'inc/template-tags.php' );
 require_once( 'inc/custom-field-salary/custom-field-flexible-table.php' );
 require_once( 'inc/custom-field-salary/custom-field-salary-normal.php' );
 require_once( 'inc/custom-field-salary/custom-field-salary-table.php' );
 
 
-add_filter( 'bill-vektor-doc-change', 'bill_doc_change_salary' );
-function bill_doc_change_salary( $doc_change ) {
+add_filter( 'bill-vektor-doc-change', 'bvsl_doc_change_salary' );
+function bvsl_doc_change_salary( $doc_change ) {
 	if ( get_post_type() == 'salary' ) {
 		$doc_change = true;
 	}
 	return $doc_change;
 }
 
-add_action( 'bill-vektor-doc-frame', 'bvot_doc_frame_salary' );
-function bvot_doc_frame_salary() {
+add_action( 'bill-vektor-doc-frame', 'bvsl_doc_frame_salary' );
+function bvsl_doc_frame_salary() {
 	if ( get_post_type() == 'salary' ) {
 		require_once( 'template-parts/doc/frame-salary.php' );
 	}

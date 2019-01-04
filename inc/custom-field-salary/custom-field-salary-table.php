@@ -40,55 +40,67 @@ class Salary_Table_Custom_Fields {
 	public static function custom_fields_array() {
 
 		$custom_fields_array = array(
-			'salary_role'           => array(
+			'salary_role'                 => array(
 				'label'       => '役職',
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
 			),
-			'salary_fuyou'          => array(
+			'salary_fuyou'                => array(
 				'label'       => '扶養人数',
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
 			),
-			'salary_base'           => array(
+			'salary_base'                 => array(
 				'label'       => '基本給',
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
 			),
-			'salary_overtime_total' => array(
+			'salary_overtime_total'       => array(
 				'label'       => '時間外賃金',
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
 			),
-			'salary_part_total'     => array(
+			'salary_part_total'           => array(
 				'label'       => 'パート賃金',
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
 			),
-			'salary_holiday_total'  => array(
+			'salary_holiday_total'        => array(
 				'label'       => '休日出勤賃金',
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
 			),
-			'salary_kenkou'         => array(
+			'salary_transportation_total' => array(
+				'label'       => '交通費',
+				'type'        => 'text',
+				'description' => '',
+				'required'    => false,
+			),
+			'salary_kenkou'               => array(
 				'label'       => '健康保険',
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
 			),
-			'salary_nenkin'         => array(
+			'salary_nenkin'               => array(
 				'label'       => '厚生年金',
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
 			),
-			'salary_jyuuminzei'     => array(
+			'salary_syotokuzei'           => array(
+				'label'       => '所得税',
+				'type'        => 'text',
+				'description' => '課税対象額をもとに<a href="https://keisan.casio.jp/exec/system/1527476109" target="_blank">給与所得の源泉徴収税額計算サイト</a>などで算出する',
+				'required'    => false,
+			),
+			'salary_jyuuminzei'           => array(
 				'label'       => '住民税',
 				'type'        => 'text',
 				'description' => '',

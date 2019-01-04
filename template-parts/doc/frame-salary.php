@@ -80,7 +80,7 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 	}
 	?>
 	<div class="row">
-		<div class="col-md-6">
+		<div class="col-sm-6">
 	<table class="table table-bordered table-striped table-bill">
 	<tbody>
 		<tr>
@@ -97,24 +97,75 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 	<tbody>
 		<tr>
 			<th>基本給</th>
-			<td class="text-right"><?php echo esc_html( $post->salary_base ); ?></td>
+			<td class="text-right"><?php echo bvsl_format_print( $post->salary_base ); ?></td>
 		</tr>
 		<tr>
 			<th>時間外賃金</th>
-			<td class="text-right"><?php echo esc_html( $post->salary_overtime_total ); ?></td>
+			<td class="text-right"><?php echo bvsl_format_print( $post->salary_overtime_total ); ?></td>
 		</tr>
 		<tr>
 			<th>パート賃金</th>
-			<td class="text-right"><?php echo esc_html( $post->salary_part_total ); ?></td>
+			<td class="text-right"><?php echo bvsl_format_print( $post->salary_part_total ); ?></td>
 		</tr>
 		<tr>
 			<th>休日出勤賃金</th>
-			<td class="text-right"><?php echo esc_html( $post->salary_holiday_total ); ?></td>
+			<td class="text-right"><?php echo bvsl_format_print( $post->salary_holiday_total ); ?></td>
 		</tr>
-		
+		<tr>
+			<th>交通費</th>
+			<td class="text-right"><?php echo bvsl_format_print( $post->salary_transportation_total ); ?></td>
+		</tr>
+		<tr>
+			<th>総支給額</th>
+			<td class="text-right"><?php echo bvsl_format_print( bvsl_get_total_pay() ); ?></td>
+		</tr>
 	</tbody>
 	</table>
-</div>
+</div><!-- [ /.col-sm-6 ] -->
+
+<?php
+/*
+  右列
+/*-------------------------------------------*/
+?>
+<div class="col-sm-6">
+<?php
+// include( 'test-display.php' );
+?>
+<table class="table table-bordered table-striped table-bill">
+<tbody>
+	<tr>
+		<th>雇用保険</th>
+		<td class="text-right"><?php echo bvsl_format_print( bvsl_get_koyou_hoken() ); ?></td>
+	</tr>
+	<tr>
+		<th>健康保険</th>
+		<td class="text-right"><?php echo bvsl_format_print( $post->salary_kenkou ); ?></td>
+	</tr>
+	<tr>
+		<th>厚生年金</th>
+		<td class="text-right"><?php echo bvsl_format_print( $post->salary_nenkin ); ?></td>
+	</tr>
+
+	<tr>
+		<th>課税対象額</th>
+		<td class="text-right"><b><?php echo bvsl_format_print( bvsl_get_kazeisyotoku() ); ?></b></td>
+	</tr>
+	<tr>
+		<th>所得税</th>
+		<td class="text-right"><?php echo bvsl_format_print( $post->salary_syotokuzei ); ?></td>
+	</tr>
+	<tr>
+		<th>住民税</th>
+		<td class="text-right"><?php echo bvsl_format_print( $post->salary_jyuuminzei ); ?></td>
+	</tr>
+	<tr>
+		<th>控除合計</th>
+		<td class="text-right"><b><?php echo bvsl_format_print( bvsl_get_koujyo_total() ); ?></b></td>
+	</tr>
+</tbody>
+</table>
+</div><!-- [ /.col-sm-6 ] -->
 </div>
 <?php if ( $post->salary_remarks ) : ?>
 <dl class="bill-remarks">
