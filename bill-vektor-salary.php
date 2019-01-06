@@ -110,3 +110,20 @@ function bill_vektor_post_types_custom_salay( $post_type_array ) {
 		return $post_type_array;
 }
 add_filter( 'bill_vektor_post_types', 'bill_vektor_post_types_custom_salay' );
+
+/**
+ * タイトルにスタッフ名と支給期間を自動入力
+ *
+ * @var [type]
+ */
+add_action( 'save_post', 'bvsl_title_auto_save' );
+function bvsl_title_auto_save() {
+	if ( ! $_POST['post_title'] ) {
+		$terms              = get_the_terms( get_the_ID(), 'salary-term' );
+		$title              = esc_html( get_the_title( $_POST['salary_staff'] ) . ' / ' . $terms[0]->name );
+		$post['post_title'] = $title;
+		remove_action( 'save_post', 'bvsl_title_auto_save' );
+		wp_update_post( $post );
+		add_action( 'save_post', 'bvsl_title_auto_save' );
+	}
+}
