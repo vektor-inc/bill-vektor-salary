@@ -48,6 +48,15 @@ echo apply_filters( 'the_content', $message );
 <div class="col-xs-5 col-xs-offset-1">
 <table class="bill-info-table">
 <tr>
+<th>支給分</th>
+<td>
+<?php
+$terms = get_the_terms( get_the_ID(), 'salary-term' );
+echo esc_html( $terms[0]->name );
+?>
+ </td>
+</tr>
+<tr>
 <th>発行日</th>
 <td><?php the_date(); ?></td>
 </tr>
@@ -73,12 +82,6 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 </div><!-- [ /.container ] -->
 
 <div class="container">
-	<?php
-	$terms = get_the_terms( get_the_ID(), 'salary-term' );
-	if ( ! empty( $terms[0]->name ) ) {
-		echo '<b>' . esc_html( $terms[0]->name ) . '</b>';
-	}
-	?>
 	<div class="row">
 		<div class="col-sm-6">
 			<!--
