@@ -26,7 +26,6 @@
 require_once( 'inc/duplicate-doc.php' );
 require_once( 'inc/staff/staff.php' );
 require_once( 'inc/template-tags.php' );
-require_once( 'inc/custom-field-salary/custom-field-flexible-table.php' );
 require_once( 'inc/custom-field-salary/custom-field-salary-normal.php' );
 require_once( 'inc/custom-field-salary/custom-field-salary-table.php' );
 
@@ -49,7 +48,7 @@ function bvsl_doc_frame_salary() {
 
 	/*
 	-------------------------------------------
-	Add Post Type Receipt
+	Add Post Type salary
 	-------------------------------------------
 	*/
 add_action( 'init', 'bill_add_post_type_salaly', 0 );
