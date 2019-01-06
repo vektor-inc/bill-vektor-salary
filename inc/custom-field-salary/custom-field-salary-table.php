@@ -30,12 +30,149 @@ class Salary_Table_Custom_Fields {
 		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_array();
 		$befor_custom_fields = '';
 		VK_Custom_Field_Builder::form_table( $custom_fields_array, $befor_custom_fields );
+
+		echo '<h4>その他 課税対象支給</h4>';
+
+		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_kazei_array();
+		VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
+
+		echo '<h4>その他 非課税支給</h4>';
+
+		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
+		VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
+
+		echo '<h4>その他 課税控除</h4>';
+
+		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_kazei_array();
+		VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
+
+		echo '<h4>その他 非課税控除</h4>';
+
+		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_hikazei_array();
+		VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
+
 	}
 
 	public static function save_custom_fields() {
+
 		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_array();
 		VK_Custom_Field_Builder::save_cf_value( $custom_fields_array );
+
+		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_kazei_array();
+		VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
+
+		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
+		VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
+
+		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_kazei_array();
+		VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
+
+		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_hikazei_array();
+		VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
+
 	}
+
+	public static function custom_fields_kazei_array() {
+		$custom_fields_array = array(
+			'field_name'        => 'kazei_additional',
+			'row_default'       => 3,
+			'row_empty_display' => false,
+			'items'             => array(
+				'name'  => array(
+					'type'             => 'text',
+					'label'            => '項目',
+					'align'            => 'left',
+					'sanitize'         => 'wp_filter_post_kses',
+					'display_callback' => '',
+				),
+				'price' => array(
+					'type'             => 'text',
+					'label'            => '金額',
+					'align'            => 'right',
+					'sanitize'         => 'wp_filter_post_kses',
+					'display_callback' => 'bvsl_format_print',
+				),
+			),
+		);
+		return $custom_fields_array;
+	}
+
+	public static function custom_fields_hikazei_array() {
+		$custom_fields_array = array(
+			'field_name'        => 'hikazei_additional',
+			'row_default'       => 3,
+			'row_empty_display' => false,
+			'items'             => array(
+				'name'  => array(
+					'type'             => 'text',
+					'label'            => '項目',
+					'align'            => 'left',
+					'sanitize'         => 'wp_filter_post_kses',
+					'display_callback' => '',
+				),
+				'price' => array(
+					'type'             => 'text',
+					'label'            => '金額',
+					'align'            => 'right',
+					'sanitize'         => 'wp_filter_post_kses',
+					'display_callback' => 'bvsl_format_print',
+				),
+			),
+		);
+		return $custom_fields_array;
+	}
+
+	public static function custom_fields_koujyo_kazei_array() {
+		$custom_fields_array = array(
+			'field_name'        => 'kazei_koujyo',
+			'row_default'       => 3,
+			'row_empty_display' => false,
+			'items'             => array(
+				'name'  => array(
+					'type'             => 'text',
+					'label'            => '項目',
+					'align'            => 'left',
+					'sanitize'         => 'wp_filter_post_kses',
+					'display_callback' => '',
+				),
+				'price' => array(
+					'type'             => 'text',
+					'label'            => '金額',
+					'align'            => 'right',
+					'sanitize'         => 'wp_filter_post_kses',
+					'display_callback' => 'bvsl_format_print',
+				),
+			),
+		);
+		return $custom_fields_array;
+	}
+
+	public static function custom_fields_koujyo_hikazei_array() {
+		$custom_fields_array = array(
+			'field_name'        => 'hikazei_koujyo',
+			'row_default'       => 3,
+			'row_empty_display' => false,
+			'items'             => array(
+				'name'  => array(
+					'type'             => 'text',
+					'label'            => '項目',
+					'align'            => 'left',
+					'sanitize'         => 'wp_filter_post_kses',
+					'display_callback' => '',
+				),
+				'price' => array(
+					'type'             => 'text',
+					'label'            => '金額',
+					'align'            => 'right',
+					'sanitize'         => 'wp_filter_post_kses',
+					'display_callback' => 'bvsl_format_print',
+				),
+			),
+		);
+		return $custom_fields_array;
+	}
+
+
 
 	public static function custom_fields_array() {
 

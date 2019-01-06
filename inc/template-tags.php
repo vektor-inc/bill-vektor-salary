@@ -42,6 +42,15 @@ function bvsl_get_total_earn( $post = '' ) {
 	$total_earn = $total_earn + bvsl_format_number( $post->salary_overtime_total );
 	$total_earn = $total_earn + bvsl_format_number( $post->salary_part_total );
 	$total_earn = $total_earn + bvsl_format_number( $post->salary_holiday_total );
+
+	if ( is_array( $post->kazei_additional ) ) {
+		foreach ( $post->kazei_additional as $key => $value ) {
+			if ( ! empty( $value['price'] ) ) {
+				$total_earn = $total_earn + bvsl_format_number( $value['price'] );
+			}
+		}
+	}
+
 	return $total_earn;
 }
 
@@ -54,6 +63,15 @@ function bvsl_get_total_pay() {
 	global $post;
 	$total_pay = bvsl_get_total_earn( $post );
 	$total_pay = $total_pay + bvsl_format_number( $post->salary_transportation_total );
+
+	if ( is_array( $post->hikazei_additional ) ) {
+		foreach ( $post->hikazei_additional as $key => $value ) {
+			if ( ! empty( $value['price'] ) ) {
+				$total_pay = $total_pay + bvsl_format_number( $value['price'] );
+			}
+		}
+	}
+
 	return $total_pay;
 }
 
@@ -63,7 +81,8 @@ function bvsl_get_total_pay() {
  * @return [type] [description]
  */
 function bvsl_get_koyou_hoken() {
-	return $koyou_hoken = round( bvsl_get_total_pay() * 0.003 );
+	$koyouhoken_taisyou = bvsl_get_total_earn() + bvsl_format_number( $post->salary_transportation_total );
+	return $koyou_hoken = round( $koyouhoken_taisyou * 0.003 );
 }
 /**
  * 課税所得

@@ -123,13 +123,22 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 			<th>交通費</th>
 			<td class="text-right"><?php echo bvsl_format_print( $post->salary_transportation_total ); ?></td>
 		</tr>
+
+<?php
+$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_kazei_array();
+echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
+
+$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
+echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
+?>
+
+		</tbody>
 		<tfoot>
 		<tr>
 			<th>支給合計</th>
 			<td class="text-right"><?php echo bvsl_format_print( bvsl_get_total_pay() ); ?></td>
 		</tr>
 	</tfoot>
-	</tbody>
 	</table>
 </div><!-- [ /.col-sm-6 ] -->
 
