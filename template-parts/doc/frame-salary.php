@@ -81,6 +81,7 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 	?>
 	<div class="row">
 		<div class="col-sm-6">
+			<!--
 	<table class="table table-bordered table-striped table-bill">
 	<tbody>
 		<tr>
@@ -89,11 +90,15 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 		</tr>
 		<tr>
 			<th>扶養人数</th>
-			<td><?php echo esc_html( $post->salary_fuyou ); ?></td>
+			<td class="text-right"><?php echo esc_html( $post->salary_fuyou ); ?></td>
 		</tr>
 	</tbody>
 	</table>
+-->
 	<table class="table table-bordered table-striped table-bill">
+	<thead>
+		<th colspan="2">支給額</th>
+	</thead>
 	<tbody>
 		<tr>
 			<th>基本給</th>
@@ -115,10 +120,12 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 			<th>交通費</th>
 			<td class="text-right"><?php echo bvsl_format_print( $post->salary_transportation_total ); ?></td>
 		</tr>
+		<tfoot>
 		<tr>
-			<th>総支給額</th>
+			<th>支給合計</th>
 			<td class="text-right"><?php echo bvsl_format_print( bvsl_get_total_pay() ); ?></td>
 		</tr>
+	</tfoot>
 	</tbody>
 	</table>
 </div><!-- [ /.col-sm-6 ] -->
@@ -133,6 +140,9 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 // include( 'test-display.php' );
 ?>
 <table class="table table-bordered table-striped table-bill">
+	<thead>
+		<th colspan="2">控除額</th>
+	</thead>
 <tbody>
 	<tr>
 		<th>雇用保険</th>
@@ -148,7 +158,7 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 	</tr>
 
 	<tr>
-		<th>課税対象額</th>
+		<th><b>課税対象額<b></th>
 		<td class="text-right"><b><?php echo bvsl_format_print( bvsl_get_kazeisyotoku() ); ?></b></td>
 	</tr>
 	<tr>
@@ -159,12 +169,24 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 		<th>住民税</th>
 		<td class="text-right"><?php echo bvsl_format_print( $post->salary_jyuuminzei ); ?></td>
 	</tr>
+	<tfoot>
 	<tr>
 		<th>控除合計</th>
-		<td class="text-right"><b><?php echo bvsl_format_print( bvsl_get_koujyo_total() ); ?></b></td>
+		<td class="text-right"><?php echo bvsl_format_print( bvsl_get_koujyo_total() ); ?></td>
+	</tr>
+	</tfoot>
+</tbody>
+</table>
+
+<table class="table table-bordered table-striped table-bill">
+<tbody>
+	<tr>
+		<th><b>差引支給額</b></th>
+		<td class="text-right"><b><?php echo bvsl_format_print( bvsl_get_total_pay() - bvsl_get_koujyo_total() ); ?></b></td>
 	</tr>
 </tbody>
 </table>
+
 </div><!-- [ /.col-sm-6 ] -->
 </div>
 <?php if ( $post->salary_remarks ) : ?>
