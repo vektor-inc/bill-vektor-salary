@@ -162,6 +162,10 @@ echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields
 		<th colspan="2">控除額</th>
 	</thead>
 <tbody>
+	<?php
+	// $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_kazei_array();
+	// echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
+	?>
 	<tr>
 		<th>雇用保険</th>
 		<td class="text-right"><?php echo bvsl_format_print( bvsl_get_koyou_hoken() ); ?></td>
@@ -174,7 +178,6 @@ echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields
 		<th>厚生年金</th>
 		<td class="text-right"><?php echo bvsl_format_print( $post->salary_nenkin ); ?></td>
 	</tr>
-
 	<tr>
 		<th><b>課税対象額<b></th>
 		<td class="text-right"><b><?php echo bvsl_format_print( bvsl_get_kazeisyotoku() ); ?></b></td>
@@ -187,6 +190,10 @@ echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields
 		<th>住民税</th>
 		<td class="text-right"><?php echo bvsl_format_print( $post->salary_jyuuminzei ); ?></td>
 	</tr>
+	<?php
+	// $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_hikazei_array();
+	// echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
+	?>
 	<tfoot>
 	<tr>
 		<th>控除合計</th>

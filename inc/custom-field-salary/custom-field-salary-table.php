@@ -41,16 +41,15 @@ class Salary_Table_Custom_Fields {
 		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
 		VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
 
-		echo '<h4>その他 課税控除</h4>';
-
-		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_kazei_array();
-		VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
-
-		echo '<h4>その他 非課税控除</h4>';
-
-		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_hikazei_array();
-		VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
-
+		// echo '<h4>その他 課税控除</h4>';
+		//
+		// $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_kazei_array();
+		// VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
+		//
+		// echo '<h4>その他 非課税控除</h4>';
+		//
+		// $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_hikazei_array();
+		// VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
 	}
 
 	public static function save_custom_fields() {
@@ -64,12 +63,11 @@ class Salary_Table_Custom_Fields {
 		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
 		VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
 
-		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_kazei_array();
-		VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
-
-		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_hikazei_array();
-		VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
-
+		// $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_kazei_array();
+		// VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
+		//
+		// $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_hikazei_array();
+		// VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
 	}
 
 	public static function custom_fields_kazei_array() {

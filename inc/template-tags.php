@@ -81,6 +81,7 @@ function bvsl_get_total_pay() {
  * @return [type] [description]
  */
 function bvsl_get_koyou_hoken() {
+	// 稼ぎの合計から雇用保険を引く
 	$koyouhoken_taisyou = bvsl_get_total_earn() + bvsl_format_number( $post->salary_transportation_total );
 	return $koyou_hoken = round( $koyouhoken_taisyou * 0.003 );
 }
