@@ -30,6 +30,9 @@ require_once( 'inc/custom-field-salary/custom-field-salary-normal.php' );
 require_once( 'inc/custom-field-salary/custom-field-salary-table.php' );
 
 
+/*
+	支給分アーカイブページのテンプレートを上書き
+--------------------------------------------- */
 add_action( 'template_redirect', 'bvsl_doc_change_salary_archive' );
 function bvsl_doc_change_salary_archive() {
 	global $wp_query;
@@ -40,6 +43,9 @@ function bvsl_doc_change_salary_archive() {
 	}
 }
 
+/*
+	詳細テンプレートを上書き
+--------------------------------------------- */
 add_filter( 'bill-vektor-doc-change', 'bvsl_doc_change_salary' );
 function bvsl_doc_change_salary( $doc_change ) {
 	if ( get_post_type() == 'salary' ) {
@@ -95,18 +101,6 @@ function bill_add_post_type_salaly() {
 			'show_ui'               => true,
 		)
 	);
-	register_taxonomy(
-		'salary-cat',
-		'salary',
-		array(
-			'hierarchical'          => true,
-			'update_count_callback' => '_update_post_term_count',
-			'label'                 => '給与明細カテゴリー',
-			'singular_label'        => '給与明細カテゴリー',
-			'public'                => true,
-			'show_ui'               => true,
-		)
-	);
 }
 
 function bill_remove_meta_boxes_comment() {
@@ -137,3 +131,17 @@ function bvsl_title_auto_save() {
 		add_action( 'save_post', 'bvsl_title_auto_save' );
 	}
 }
+
+/*
+	支給分アーカイブで、スタッフ番号順になるように書き換え
+--------------------------------------------- */
+add_action(
+	'pre_get_posts', function( $query ) {
+		if ( is_admin() || ! $query->is_main_query() ) {
+			return;
+		}
+		$query->set( 'meta_key', 'salary_staff_number' );
+		$query->set( 'orderby', 'meta_value' );
+		$query->set( 'order', 'ASC' );
+	}
+);

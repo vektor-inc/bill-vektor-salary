@@ -60,6 +60,12 @@ echo esc_html( $terms[0]->name );
 <th>発行日</th>
 <td><?php the_date(); ?></td>
 </tr>
+<?php if ( $post->salary_staff_number ) : ?>
+<tr>
+<th>Staff No.</th>
+<td><?php echo esc_html( $post->salary_staff_number ); ?></td>
+</tr>
+<?php endif; ?>
 </table>
 
 <div class="bill-address-own">
@@ -83,7 +89,7 @@ if ( isset( $options['own-seal'] ) && $options['own-seal'] ) {
 
 <div class="container">
 	<div class="row">
-		<div class="col-sm-6">
+		<div class="col-xs-6">
 			<!--
 	<table class="table table-bordered table-striped table-bill">
 	<tbody>
@@ -140,14 +146,14 @@ echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields
 		</tr>
 	</tfoot>
 	</table>
-</div><!-- [ /.col-sm-6 ] -->
+</div><!-- [ /.col-xs-6 ] -->
 
 <?php
 /*
   右列
 /*-------------------------------------------*/
 ?>
-<div class="col-sm-6">
+<div class="col-xs-6">
 <?php
 // include( 'test-display.php' );
 ?>
@@ -199,7 +205,7 @@ echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields
 </tbody>
 </table>
 
-</div><!-- [ /.col-sm-6 ] -->
+</div><!-- [ /.col-xs-6 ] -->
 </div>
 <?php if ( $post->salary_remarks ) : ?>
 <dl class="bill-remarks">

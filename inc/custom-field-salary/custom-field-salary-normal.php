@@ -77,6 +77,12 @@ class Salary_Normal_Custom_Fields {
 				'required'    => true,
 				'options'     => $staff,
 			),
+			'salary_staff_number'  => array(
+				'label'       => 'Staff No.',
+				'type'        => 'text',
+				'description' => '支給分一覧ではこの値が小さい順に表示されます。',
+				'required'    => false,
+			),
 			'salary_message'       => array(
 				'label'       => 'メッセージ',
 				'type'        => 'textarea',
