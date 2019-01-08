@@ -7,7 +7,7 @@
  * Author URI:      https://billvektor.com/
  * Text Domain:     bill-vektor-salary
  * Domain Path:     /languages
- * Version:         1.0.0
+ * Version:         0.1.0
  *
  * @package         Bill_Vektor_Salary
  */
@@ -16,13 +16,14 @@
   ---------------------------------------------
 	 updater
  --------------------------------------------- */
-// require 'inc/plugin-update-checker/plugin-update-checker.php';
-// $myUpdateChecker = Puc_v4_Factory::buildUpdateChecker(
-// 'https://lightning.nagoya/wp-content/vk-data-files/bill-vektor-salary-49308514/plugin-update-config.json',
-// __FILE__,
-// 'bill-vektor-salary'
-// );
-// Your code starts here.
+require 'inc/plugin-update-checker/plugin-update-checker.php';
+$myUpdateChecker = Puc_v4_Factory::buildUpdateChecker(
+	'https://github.com/vektor-inc/bill-vektor-salary',
+	__FILE__, // Full path to the main plugin file or functions.php.
+	'bill-vektor-salary'
+);
+$myUpdateChecker->setBranch( 'master' );
+
 require_once( 'inc/duplicate-doc.php' );
 require_once( 'inc/staff/staff.php' );
 require_once( 'inc/template-tags.php' );
