@@ -1,13 +1,13 @@
 <?php
 /**
  * Plugin Name:     BillVektor Salary
- * Plugin URI:
- * Description:
+ * Plugin URI:      https://billvektor.com/
+ * Description:     BillVektorで給与明細管理をするためのプラグインです。
  * Author:          Vektor,Inc.
  * Author URI:      https://billvektor.com/
  * Text Domain:     bill-vektor-salary
  * Domain Path:     /languages
- * Version:         0.1.0
+ * Version:         0.1.1
  *
  * @package         Bill_Vektor_Salary
  */
