@@ -140,8 +140,10 @@ add_action(
 		if ( is_admin() || ! $query->is_main_query() ) {
 			return;
 		}
-		$query->set( 'meta_key', 'salary_staff_number' );
-		$query->set( 'orderby', 'meta_value' );
-		$query->set( 'order', 'ASC' );
+		if ( $query->is_tax( 'salary-term' ) ) {
+			$query->set( 'meta_key', 'salary_staff_number' );
+			$query->set( 'orderby', 'meta_value' );
+			$query->set( 'order', 'ASC' );
+		}
 	}
 );
