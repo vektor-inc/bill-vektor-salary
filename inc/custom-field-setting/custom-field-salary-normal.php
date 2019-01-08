@@ -44,8 +44,9 @@ class Salary_Normal_Custom_Fields {
 		$args        = array(
 			'post_type'      => 'staff',
 			'posts_per_page' => -1,
+			'meta_key'       => 'salary_staff_number',
+			'orderby'        => 'meta_value',
 			'order'          => 'ASC',
-			'orderby'        => 'title',
 		);
 		$staff_posts = get_posts( $args );
 		if ( $staff_posts ) {

@@ -26,9 +26,9 @@
 require_once( 'inc/duplicate-doc.php' );
 require_once( 'inc/staff/staff.php' );
 require_once( 'inc/template-tags.php' );
-require_once( 'inc/custom-field-salary/custom-field-salary-normal.php' );
-require_once( 'inc/custom-field-salary/custom-field-salary-table.php' );
-
+require_once( 'inc/custom-field-setting/custom-field-salary-normal.php' );
+require_once( 'inc/custom-field-setting/custom-field-salary-table.php' );
+require_once( 'inc/custom-field-setting/custom-field-staff.php' );
 
 /*
 	支給分アーカイブページのテンプレートを上書き
