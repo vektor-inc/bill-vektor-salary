@@ -122,14 +122,16 @@ add_filter( 'bill_vektor_post_types', 'bill_vektor_post_types_custom_salay' );
  */
 add_action( 'save_post', 'bvsl_title_auto_save' );
 function bvsl_title_auto_save() {
-	if ( empty( $_POST['post_title'] ) ) {
-		$terms              = get_the_terms( get_the_ID(), 'salary-term' );
-		$title              = esc_html( get_the_title( $_POST['salary_staff'] ) . ' / ' . $terms[0]->name );
-		$post['post_title'] = $title;
-		$post['ID']         = get_the_ID();
-		remove_action( 'save_post', 'bvsl_title_auto_save' );
-		wp_update_post( $post );
-		add_action( 'save_post', 'bvsl_title_auto_save' );
+	if ( 'salary' == get_post_type() ) {
+		if ( empty( $_POST['post_title'] ) ) {
+			$terms              = get_the_terms( get_the_ID(), 'salary-term' );
+			$title              = esc_html( get_the_title( $_POST['salary_staff'] ) . ' / ' . $terms[0]->name );
+			$post['post_title'] = $title;
+			$post['ID']         = get_the_ID();
+			remove_action( 'save_post', 'bvsl_title_auto_save' );
+			wp_update_post( $post );
+			add_action( 'save_post', 'bvsl_title_auto_save' );
+		}
 	}
 }
 
