@@ -11,6 +11,18 @@
 global $wp_query;
 
 if ( $wp_query->have_posts() ) {
+
+	$total_earn   = 0;
+	$total_pay    = 0;
+	$koyou_hoken  = 0;
+	$kenkou_hoken = 0;
+	$nenkin       = 0;
+	$kazeisyotoku = 0;
+	$syotokuzei   = 0;
+	$jyuuminzei   = 0;
+	$koujyo       = 0;
+	$sasihiki     = 0;
+
 	while ( have_posts() ) :
 		the_post();
 
