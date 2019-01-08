@@ -217,6 +217,15 @@ class Salary_Table_Custom_Fields {
 				'description' => '',
 				'required'    => false,
 			),
+			'salary_koyouhoken'           => array(
+				'label'       => '雇用保険',
+				'type'        => 'checkbox',
+				'description' => '未チェックの場合は自動計算されます。雇用保険対象外の場合はチェックしてください。',
+				'options'     => array(
+					'not_auto_cal' => '自動計算しない',
+				),
+				'required'    => false,
+			),
 			'salary_kenkou'               => array(
 				'label'       => '健康保険',
 				'type'        => 'text',
