@@ -28,6 +28,8 @@ if ( $wp_query->have_posts() ) {
 
 		require( 'frame-salary.php' );
 
+		echo edit_post_link( '▲ 編集', '<div class="container"><div class="no-print text-right">[ ', ' ]</div></div>', $id, $class );
+
 		$total_earn   = $total_earn + bvsl_get_total_earn();
 		$total_pay    = $total_pay + bvsl_get_total_pay();
 		$koyou_hoken  = $koyou_hoken + bvsl_get_koyou_hoken();
