@@ -19,12 +19,12 @@ if ( $post->salary_document_name ) {
 </span>
 <span class="bill-destination-honorific">
 <?php
-$client_honorific = esc_html( get_post_meta( $post->salary_staff, 'client_honorific', true ) );
-if ( $client_honorific ) {
-	echo $client_honorific;
-} else {
+// $client_honorific = esc_html( get_post_meta( $post->salary_staff, 'client_honorific', true ) );
+// if ( $client_honorific ) {
+// echo $client_honorific;
+// } else {
 	echo '様';
-}
+// }
 ?>
 </span>
 </h2>
@@ -69,23 +69,6 @@ echo esc_html( $terms[0]->name );
 <?php endif; ?>
 </table>
 
-<div class="bill-address-own">
-<?php $options = get_option( 'bill-setting', Bill_Admin::options_default() ); ?>
-	<h4 class="text-right">
-	<?php
-	if ( isset( $options['own-logo'] ) && $options['own-logo'] ) {
-		$attr = array(
-			'id'    => 'bill-logo',
-			'class' => 'bill-logo',
-			'alt'   => trim( strip_tags( get_post_meta( $options['own-logo'], '_wp_attachment_image_alt', true ) ) ),
-		);
-		echo wp_get_attachment_image( $options['own-logo'], 'medium', false, $attr );
-	} else {
-		echo esc_html( $options['own-name'] );
-	}
-	?>
-	</h4>
-</div><!-- [ /.address-own ] -->
 </div><!-- [ /.col-xs-5 col-xs-offset-1 ] -->
 </div><!-- [ /.row ] -->
 </div><!-- [ /.container ] -->
@@ -93,7 +76,7 @@ echo esc_html( $terms[0]->name );
 <div class="container">
 	<div class="row">
 		<div class="col-xs-6">
-			<!--
+<!--
 	<table class="table table-bordered table-striped table-bill">
 	<tbody>
 		<tr>
@@ -217,6 +200,7 @@ echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields
 
 </div><!-- [ /.col-xs-6 ] -->
 </div>
+
 <?php if ( $post->salary_remarks ) : ?>
 <dl class="bill-remarks">
 <dt>備考</dt>
@@ -225,5 +209,22 @@ echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields
 </dd>
 </dl>
 <?php endif; ?>
+<div class="bill-footer">
+<?php
+$options = get_option( 'bill-setting', Bill_Admin::options_default() );
+
+if ( isset( $options['own-logo'] ) && $options['own-logo'] ) {
+	$attr = array(
+		'id'    => '',
+		'class' => 'bill-footer-logo',
+		'alt'   => trim( strip_tags( get_post_meta( $options['own-logo'], '_wp_attachment_image_alt', true ) ) ),
+	);
+	echo wp_get_attachment_image( $options['own-logo'], 'medium', false, $attr );
+} else {
+	echo '<h4>' . esc_html( $options['own-name'] ) . '</h4>';
+}
+?>
+</div>
+
 </div><!-- [ /.container ] -->
 </div><!-- [ /.bill-wrap ] -->
