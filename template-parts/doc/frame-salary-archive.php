@@ -135,7 +135,7 @@ if ( $wp_query->have_posts() ) {
 		the_post();
 			echo '<tr>';
 			echo '<td>' . esc_html( get_the_title( $post->salary_staff ) ) . '</td>';
-			echo '<td class="text-right">' . bvsl_format_print( bvsl_get_total_pay() ) . '</td>';
+			echo '<td class="text-right">' . bvsl_format_print( bvsl_get_total_pay() - bvsl_get_koujyo_total() ) . '</td>';
 			echo '<td>' . esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_bank', true ) ) . '</td>';
 			echo '<td>' . esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_branch', true ) ) . '</td>';
 			echo '<td>' . esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_type', true ) ) . '</td>';
