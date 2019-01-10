@@ -43,9 +43,14 @@ if ( $wp_query->have_posts() ) {
 	endwhile;
 }
 ?>
-
+<?php
+/*
+  合計
+/*-------------------------------------------*/
+?>
 <div class="bill-wrap">
 <div class="container">
+<h1 class="bill-title">合計金額</h1>
 <div class="row">
 <div class="col-xs-6">
 	<table class="table table-bordered table-striped table-bill">
@@ -98,6 +103,52 @@ if ( $wp_query->have_posts() ) {
 </table>
 </div>
 </div><!-- [ /.row ] -->
+</div><!-- [ /.container ] -->
+</div><!-- [ /.bill-wrap ] -->
+
+<?php
+/*
+  振込情報
+/*-------------------------------------------*/
+?>
+<div class="bill-wrap">
+<div class="container">
+<h1 class="bill-title">振込情報</h1>
+<?php
+if ( $wp_query->have_posts() ) {
+?>
+	<table class="table table-bordered table-striped table-bill">
+		<thead>
+			<tr>
+				<th>氏名</th>
+				<th>振込金額</th>
+				<th>振込銀行名</th>
+				<th>支店名</th>
+				<th>口座種類</th>
+				<th>口座番号</th>
+				<th class="no-print"></th>
+			</tr>
+		</thead>
+	<?php
+	while ( have_posts() ) :
+
+		the_post();
+			echo '<tr>';
+			echo '<td>' . esc_html( get_the_title( $post->salary_staff ) ) . '</td>';
+			echo '<td class="text-right">' . bvsl_format_print( bvsl_get_total_pay() ) . '</td>';
+			echo '<td>' . esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_bank', true ) ) . '</td>';
+			echo '<td>' . esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_branch', true ) ) . '</td>';
+			echo '<td>' . esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_type', true ) ) . '</td>';
+			echo '<td>' . esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_number', true ) ) . '</td>';
+			echo '<td class="no-print text-center">';
+			echo edit_post_link( '編集', '', '' );
+			echo '</td>';
+		echo '</tr>';
+
+		endwhile;
+		echo '</table>';
+}
+	?>
 </div><!-- [ /.container ] -->
 </div><!-- [ /.bill-wrap ] -->
 

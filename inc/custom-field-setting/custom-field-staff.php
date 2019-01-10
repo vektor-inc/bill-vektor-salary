@@ -42,11 +42,40 @@ class Staff_Custom_Fields {
 	public static function custom_fields_array() {
 
 		$custom_fields_array = array(
-			'salary_staff_number' => array(
+			'salary_staff_number'            => array(
 				'label'       => 'Staff No.',
 				'type'        => 'text',
 				'description' => '※各明細で別途手入力する必要があります。',
 				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
+			),
+			'salary_transfer_account_bank'   => array(
+				'label'       => '振込銀行名',
+				'type'        => 'text',
+				'description' => '',
+				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
+			),
+			'salary_transfer_account_branch' => array(
+				'label'       => '支店名',
+				'type'        => 'text',
+				'description' => '',
+				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
+			),
+			'salary_transfer_account_type'   => array(
+				'label'       => '口座種類',
+				'type'        => 'text',
+				'description' => '',
+				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
+			),
+			'salary_transfer_account_number' => array(
+				'label'       => '口座番号',
+				'type'        => 'text',
+				'description' => '',
+				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
 			),
 		);
 		return $custom_fields_array;
