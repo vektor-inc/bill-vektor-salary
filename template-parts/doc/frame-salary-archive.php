@@ -27,7 +27,8 @@ if ( $wp_query->have_posts() ) {
 		the_post();
 
 		require( 'frame-salary.php' );
-
+		$id    = '';
+		$class = '';
 		echo edit_post_link( '▲ 編集', '<div class="container"><div class="no-print text-right">[ ', ' ]</div></div>', $id, $class );
 
 		$total_earn   = $total_earn + bvsl_get_total_earn();
