@@ -105,6 +105,9 @@ function bvsl_get_kazeisyotoku() {
 	※ bvsl_get_total_earn() には非課税の手当は含まれていないので引かなくて良い
 	*/
 	$kazeisyotoku = bvsl_get_total_earn() - bvsl_get_koujyo_kazei();
+	if ( $kazeisyotoku < 0 ) {
+		$kazeisyotoku = 0;
+	}
 	return $kazeisyotoku;
 }
 
