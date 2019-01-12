@@ -90,45 +90,62 @@ echo esc_html( $terms[0]->name );
 	</tbody>
 	</table>
 -->
-	<table class="table table-bordered table-striped table-bill">
+	<table class="table table-bordered table-bill">
 	<thead>
 		<th colspan="2">支給額</th>
 	</thead>
 	<tbody>
 		<tr>
 			<th>基本給</th>
-			<td class="text-right"><?php echo bvsl_format_print( $post->salary_base ); ?></td>
+			<td class="price"><?php echo bvsl_format_print( $post->salary_base ); ?></td>
 		</tr>
 		<tr>
 			<th>時間外賃金</th>
-			<td class="text-right"><?php echo bvsl_format_print( $post->salary_overtime_total ); ?></td>
+			<td class="price"><?php echo bvsl_format_print( $post->salary_overtime_total ); ?></td>
 		</tr>
 		<tr>
 			<th>パート賃金</th>
-			<td class="text-right"><?php echo bvsl_format_print( $post->salary_part_total ); ?></td>
+			<td class="price"><?php echo bvsl_format_print( $post->salary_part_total ); ?></td>
 		</tr>
 		<tr>
 			<th>休日出勤賃金</th>
-			<td class="text-right"><?php echo bvsl_format_print( $post->salary_holiday_total ); ?></td>
+			<td class="price"><?php echo bvsl_format_print( $post->salary_holiday_total ); ?></td>
 		</tr>
 		<tr>
-			<th>交通費</th>
-			<td class="text-right"><?php echo bvsl_format_print( $post->salary_transportation_total ); ?></td>
+			<th>通勤費</th>
+			<td class="price"><?php echo bvsl_format_print( $post->salary_transportation_total ); ?></td>
 		</tr>
+		</tbody>
 
 <?php
 $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_kazei_array();
-echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
+$custom_fields_kazei = VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
+if ( $custom_fields_kazei ) {
+	echo '<thead class="thead-dark">';
+	echo '<tr><th colspan="2">その他支給（課税対象）</th></tr>';
+	echo '<thead>';
+	echo '<tbody>';
+	echo $custom_fields_kazei;
+	echo '</tbody>';
+}
 
-$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
-echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
+$custom_fields_array   = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
+$custom_fields_hikazei = VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
+if ( $custom_fields_hikazei ) {
+	echo '<thead class="thead-dark">';
+	echo '<tr><th colspan="2">その他支給（非課税）</th></tr>';
+	echo '<thead>';
+	echo '<tbody>';
+	echo $custom_fields_hikazei;
+	echo '</tbody>';
+}
 ?>
 
 		</tbody>
 		<tfoot>
 		<tr>
 			<th>支給合計</th>
-			<td class="text-right"><?php echo bvsl_format_print( bvsl_get_total_pay() ); ?></td>
+			<td class="price"><?php echo bvsl_format_print( bvsl_get_total_pay() ); ?></td>
 		</tr>
 	</tfoot>
 	</table>
@@ -143,7 +160,7 @@ echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields
 <?php
 // include( 'test-display.php' );
 ?>
-<table class="table table-bordered table-striped table-bill">
+<table class="table table-bordered table-bill">
 	<thead>
 		<th colspan="2">控除額</th>
 	</thead>
@@ -154,48 +171,43 @@ echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields
 	?>
 	<tr>
 		<th>雇用保険</th>
-		<td class="text-right"><?php echo bvsl_format_print( bvsl_get_koyou_hoken() ); ?></td>
+		<td class="price"><?php echo bvsl_format_print( bvsl_get_koyou_hoken() ); ?></td>
 	</tr>
 	<tr>
 		<th>健康保険</th>
-		<td class="text-right"><?php echo bvsl_format_print( $post->salary_kenkou ); ?></td>
+		<td class="price"><?php echo bvsl_format_print( $post->salary_kenkou ); ?></td>
 	</tr>
 	<tr>
 		<th>厚生年金</th>
-		<td class="text-right"><?php echo bvsl_format_print( $post->salary_nenkin ); ?></td>
-	</tr>
-	<tr>
-		<th><b>課税対象額<b></th>
-		<td class="text-right"><b><?php echo bvsl_format_print( bvsl_get_kazeisyotoku() ); ?></b></td>
+		<td class="price"><?php echo bvsl_format_print( $post->salary_nenkin ); ?></td>
 	</tr>
 	<tr>
 		<th>所得税</th>
-		<td class="text-right"><?php echo bvsl_format_print( $post->salary_syotokuzei ); ?></td>
+		<td class="price"><?php echo bvsl_format_print( $post->salary_syotokuzei ); ?></td>
 	</tr>
 	<tr>
 		<th>住民税</th>
-		<td class="text-right"><?php echo bvsl_format_print( $post->salary_jyuuminzei ); ?></td>
+		<td class="price"><?php echo bvsl_format_print( $post->salary_jyuuminzei ); ?></td>
 	</tr>
 	<?php
 	// $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_hikazei_array();
 	// echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
 	?>
-	<tfoot>
+	</tbody>
+<tfoot>
 	<tr>
-		<th>控除合計</th>
-		<td class="text-right"><?php echo bvsl_format_print( bvsl_get_koujyo_total() ); ?></td>
+	<th>控除合計</th>
+	<td class="price"><?php echo bvsl_format_print( bvsl_get_koujyo_total() ); ?></td>
 	</tr>
-	</tfoot>
-</tbody>
-</table>
-
-<table class="table table-bordered table-striped table-bill">
-<tbody>
 	<tr>
-		<th><b>差引支給額</b></th>
-		<td class="text-right"><b><?php echo bvsl_format_print( bvsl_get_total_pay() - bvsl_get_koujyo_total() ); ?></b></td>
+	<th><b>課税対象額<b></th>
+	<td class="price"><b><?php echo bvsl_format_print( bvsl_get_kazeisyotoku() ); ?></b></td>
 	</tr>
-</tbody>
+	<tr>
+	<th><b>差引支給額</b></th>
+	<td class="price"><b><?php echo bvsl_format_print( bvsl_get_total_pay() - bvsl_get_koujyo_total() ); ?></b></td>
+	</tr>
+</tfoot>
 </table>
 
 </div><!-- [ /.col-xs-6 ] -->
