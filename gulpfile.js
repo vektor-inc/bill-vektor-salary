@@ -28,5 +28,5 @@ gulp.task('dist', function() {
 				base: './'
 			}
 		)
-		.pipe(gulp.dest('dist/bill-vektor-other-docs')); // distディレクトリに出力
+		.pipe(gulp.dest('dist/bill-vektor-other-salary')); // distディレクトリに出力
 });
