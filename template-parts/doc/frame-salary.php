@@ -59,7 +59,12 @@ echo esc_html( $terms[0]->name );
 </tr>
 <tr>
 <th>発行日</th>
-<td><?php the_date(); ?></td>
+<td>
+<?php
+// the_date だと同じ日の場合に2つ目以降の日付が表示されないため
+echo get_the_date();
+?>
+</td>
 </tr>
 <?php if ( $post->salary_staff_number ) : ?>
 <tr>
