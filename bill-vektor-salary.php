@@ -114,6 +114,18 @@ function bill_add_post_type_salaly() {
 			'show_ui'               => true,
 		)
 	);
+	register_taxonomy(
+		'salary-tag',
+		'salary',
+		array(
+			'hierarchical'          => false,
+			'update_count_callback' => '_update_post_term_count',
+			'label'                 => 'タグ',
+			'singular_label'        => 'タグ',
+			'public'                => true,
+			'show_ui'               => true,
+		)
+	);
 }
 
 function bill_remove_meta_boxes_comment() {
