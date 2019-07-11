@@ -7,7 +7,7 @@
  * Author URI:      https://billvektor.com/
  * Text Domain:     bill-vektor-salary
  * Domain Path:     /languages
- * Version:         0.4.0
+ * Version:         0.4.1
  *
  * @package         Bill_Vektor_Salary
  */
