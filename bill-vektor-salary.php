@@ -49,8 +49,13 @@ require_once( 'inc/custom-field-setting/custom-field-staff.php' );
 add_action( 'template_redirect', 'bvsl_doc_change_salary_archive' );
 function bvsl_doc_change_salary_archive() {
 	global $wp_query;
-	$post_type = bill_get_post_type();
-	if ( $post_type['slug'] == 'salary' && is_tax() ) {
+	if ( function_exists( 'bill_get_post_type' ) ) {
+		$post_type = bill_get_post_type();
+		$post_type = $post_type['slug'];
+	} else {
+		$post_type = get_post_type();
+	}
+	if ( $post_type == 'salary' && is_tax() ) {
 		require_once( 'template-parts/doc/frame-salary-archive.php' );
 		die();
 	}
