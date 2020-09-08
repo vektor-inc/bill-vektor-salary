@@ -40,6 +40,7 @@ if ( $wp_query->have_posts() ) {
 		$syotokuzei   = $syotokuzei + bvsl_format_number( $post->salary_syotokuzei );
 		$jyuuminzei   = $jyuuminzei + bvsl_format_number( $post->salary_jyuuminzei );
 		$koujyo       = $koujyo + bvsl_get_koujyo_total();
+		// ↓ここが1円ずれる事がある？
 		$sasihiki     = $sasihiki + bvsl_get_total_pay() - bvsl_get_koujyo_total();
 	endwhile;
 }
