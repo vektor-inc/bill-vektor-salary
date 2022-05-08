@@ -154,8 +154,13 @@ add_action( 'save_post', 'bvsl_title_auto_save' );
 function bvsl_title_auto_save() {
 	if ( 'salary' == get_post_type() ) {
 		if ( empty( $_POST['post_title'] ) ) {
-			$terms              = get_the_terms( get_the_ID(), 'salary-term' );
-			$title              = esc_html( get_the_title( $_POST['salary_staff'] ) . ' / ' . $terms[0]->name );
+			$terms = get_the_terms( get_the_ID(), 'salary-term' );
+			if ( $_POST['salary_staff'] ) {
+				$title = esc_html( get_the_title( $_POST['salary_staff'] ) );
+			}
+			if ( isset( $terms[0]->name ) ) {
+				$title .= esc_html( ' / ' . $terms[0]->name );
+			}
 			$post['post_title'] = $title;
 			$post['ID']         = get_the_ID();
 			remove_action( 'save_post', 'bvsl_title_auto_save' );
