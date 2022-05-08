@@ -26,7 +26,7 @@ if ( $wp_query->have_posts() ) {
 	while ( have_posts() ) :
 		the_post();
 
-		require( 'frame-salary.php' );
+		require 'frame-salary.php';
 		$id    = '';
 		$class = '';
 		echo edit_post_link( '▲ 編集', '<div class="container"><div class="no-print text-right">[ ', ' ]</div></div>', $id, $class );
@@ -41,7 +41,7 @@ if ( $wp_query->have_posts() ) {
 		$jyuuminzei   = $jyuuminzei + bvsl_format_number( $post->salary_jyuuminzei );
 		$koujyo       = $koujyo + bvsl_get_koujyo_total();
 		// ↓ここが1円ずれる事がある？
-		$sasihiki     = $sasihiki + bvsl_get_total_pay() - bvsl_get_koujyo_total();
+		$sasihiki = $sasihiki + bvsl_get_total_pay() - bvsl_get_koujyo_total();
 	endwhile;
 }
 ?>
@@ -118,7 +118,7 @@ if ( $wp_query->have_posts() ) {
 <h1 class="bill-title">振込情報</h1>
 <?php
 if ( $wp_query->have_posts() ) {
-?>
+	?>
 	<table class="table table-bordered table-striped table-bill">
 		<thead>
 			<tr>
@@ -150,7 +150,24 @@ if ( $wp_query->have_posts() ) {
 		endwhile;
 		echo '</table>';
 }
-	?>
+?>
+</div><!-- [ /.container ] -->
+</div><!-- [ /.bill-wrap ] -->
+
+<div class="bill-wrap">
+<div class="container">
+<h1 class="bill-title">振込情報</h1>
+<?php
+if ( $wp_query->have_posts() ) {
+	while ( have_posts() ) :
+		the_post();
+			echo '[ ' . esc_html( get_the_title( $post->salary_staff ) ) . ' ] <br>';
+			echo bvsl_format_print( bvsl_get_total_pay() - bvsl_get_koujyo_total() ) . '<br />';
+			echo esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_bank', true ) ) .  ' ' . esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_branch', true ) ) . ' ' . esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_type', true ) ) . ' ' . esc_html( get_post_meta( $post->salary_staff, 'salary_transfer_account_number', true ) ) . '<br />';
+		echo '<br/>';
+	endwhile;
+}
+?>
 </div><!-- [ /.container ] -->
 </div><!-- [ /.bill-wrap ] -->
 

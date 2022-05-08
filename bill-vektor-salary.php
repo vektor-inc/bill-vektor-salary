@@ -7,7 +7,7 @@
  * Author URI:      https://billvektor.com/
  * Text Domain:     bill-vektor-salary
  * Domain Path:     /languages
- * Version:         0.4.2
+ * Version:         0.5.0
  *
  * @package         Bill_Vektor_Salary
  */
@@ -16,7 +16,8 @@
 	 テーマがBillVektorじゃない時は誤動作防止のために読み込ませない
  --------------------------------------------- */
 add_action(
-	'after_setup_theme', function() {
+	'after_setup_theme',
+	function() {
 		if ( ! function_exists( 'bill_get_post_type' ) ) {
 			// 読み込まずに終了
 			return;
@@ -36,12 +37,12 @@ $myUpdateChecker = Puc_v4_Factory::buildUpdateChecker(
 );
 $myUpdateChecker->setBranch( 'master' );
 
-require_once( 'inc/duplicate-doc.php' );
-require_once( 'inc/staff/staff.php' );
-require_once( 'inc/template-tags.php' );
-require_once( 'inc/custom-field-setting/custom-field-salary-normal.php' );
-require_once( 'inc/custom-field-setting/custom-field-salary-table.php' );
-require_once( 'inc/custom-field-setting/custom-field-staff.php' );
+require_once 'inc/duplicate-doc.php';
+require_once 'inc/staff/staff.php';
+require_once 'inc/template-tags.php';
+require_once 'inc/custom-field-setting/custom-field-salary-normal.php';
+require_once 'inc/custom-field-setting/custom-field-salary-table.php';
+require_once 'inc/custom-field-setting/custom-field-staff.php';
 
 /*
 	支給分アーカイブページのテンプレートを上書き
@@ -56,7 +57,7 @@ function bvsl_doc_change_salary_archive() {
 		$post_type = get_post_type();
 	}
 	if ( $post_type == 'salary' && is_tax() ) {
-		require_once( 'template-parts/doc/frame-salary-archive.php' );
+		require_once 'template-parts/doc/frame-salary-archive.php';
 		die();
 	}
 }
@@ -75,7 +76,7 @@ function bvsl_doc_change_salary( $doc_change ) {
 add_action( 'bill-vektor-doc-frame', 'bvsl_doc_frame_salary' );
 function bvsl_doc_frame_salary() {
 	if ( get_post_type() == 'salary' ) {
-		require_once( 'template-parts/doc/frame-salary.php' );
+		require_once 'template-parts/doc/frame-salary.php';
 	}
 }
 
@@ -153,8 +154,13 @@ add_action( 'save_post', 'bvsl_title_auto_save' );
 function bvsl_title_auto_save() {
 	if ( 'salary' == get_post_type() ) {
 		if ( empty( $_POST['post_title'] ) ) {
-			$terms              = get_the_terms( get_the_ID(), 'salary-term' );
-			$title              = esc_html( get_the_title( $_POST['salary_staff'] ) . ' / ' . $terms[0]->name );
+			$terms = get_the_terms( get_the_ID(), 'salary-term' );
+			if ( $_POST['salary_staff'] ) {
+				$title = esc_html( get_the_title( $_POST['salary_staff'] ) );
+			}
+			if ( isset( $terms[0]->name ) ) {
+				$title .= esc_html( ' / ' . $terms[0]->name );
+			}
 			$post['post_title'] = $title;
 			$post['ID']         = get_the_ID();
 			remove_action( 'save_post', 'bvsl_title_auto_save' );
@@ -168,7 +174,8 @@ function bvsl_title_auto_save() {
 	支給分アーカイブで、スタッフ番号順になるように書き換え
 --------------------------------------------- */
 add_action(
-	'pre_get_posts', function( $query ) {
+	'pre_get_posts',
+	function( $query ) {
 		if ( is_admin() || ! $query->is_main_query() ) {
 			return;
 		}
