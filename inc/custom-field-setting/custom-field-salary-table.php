@@ -233,8 +233,8 @@ class Salary_Table_Custom_Fields {
 				'type'        => 'select',
 				'description' => '選択時期によって雇用保険料が変わります。よく確認して選択してください。',
 				'options'     => array(
-					'20220930_before' => '〜令和４年９月30日',
-					'20221001_after' => '令和４年10月1日〜',
+					'20220930_before' => '〜令和4年9月30日',
+					'20221001_after' => '令和4年10月1日〜',
 				),
 				'required'    => true,
 			),
