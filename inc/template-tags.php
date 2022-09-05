@@ -91,7 +91,12 @@ function bvsl_get_koyou_hoken() {
 	}
 	// 稼ぎの合計から雇用保険を引く
 	$koyouhoken_taisyou = bvsl_get_total_earn() + bvsl_format_number( $post->salary_transportation_total );
-	return $koyou_hoken = round( $koyouhoken_taisyou * 0.003 );
+	if ( '20221001_after' === $post->salary_target_term ){
+		$rate = 0.005;
+	} else {
+		$rate = 0.003;
+	}
+	return $koyou_hoken = round( $koyouhoken_taisyou * $rate );
 }
 /**
  * 課税所得
