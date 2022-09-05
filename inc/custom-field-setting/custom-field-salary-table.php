@@ -27,18 +27,18 @@ class Salary_Table_Custom_Fields {
 	public static function fields_form() {
 		global $post;
 
-		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_array();
+		$custom_fields_array = self::custom_fields_array();
 		$befor_custom_fields = '';
 		VK_Custom_Field_Builder::form_table( $custom_fields_array, $befor_custom_fields );
 
 		echo '<h4>その他 課税対象支給</h4>';
 
-		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_kazei_array();
+		$custom_fields_array = self::custom_fields_kazei_array();
 		VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
 
 		echo '<h4>その他 非課税支給</h4>';
 
-		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
+		$custom_fields_array = self::custom_fields_hikazei_array();
 		VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
 
 		// echo '<h4>その他 課税控除</h4>';
@@ -54,13 +54,13 @@ class Salary_Table_Custom_Fields {
 
 	public static function save_custom_fields() {
 
-		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_array();
+		$custom_fields_array = self::custom_fields_array();
 		VK_Custom_Field_Builder::save_cf_value( $custom_fields_array );
 
-		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_kazei_array();
+		$custom_fields_array = self::custom_fields_kazei_array();
 		VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
 
-		$custom_fields_array = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
+		$custom_fields_array = self::custom_fields_hikazei_array();
 		VK_Custom_Field_Builder_Flexible_Table::save_cf_value( $custom_fields_array );
 
 		// $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_kazei_array();
@@ -227,6 +227,16 @@ class Salary_Table_Custom_Fields {
 					'not_auto_cal' => '自動計算しない',
 				),
 				'required'    => false,
+			),
+			'salary_target_term'          => array(
+				'label'       => '給与対象時期',
+				'type'        => 'select',
+				'description' => '選択時期によって雇用保険料が変わります。よく確認して選択してください。',
+				'options'     => array(
+					'20220930_before' => '〜令和４年９月30日',
+					'20221001_after' => '令和４年10月1日〜',
+				),
+				'required'    => true,
 			),
 			'salary_kenkou'               => array(
 				'label'       => '健康保険',
