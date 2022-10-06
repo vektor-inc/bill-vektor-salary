@@ -76,6 +76,21 @@ function bvsl_get_total_pay() {
 }
 
 /**
+ * 雇用保険料の料率
+ *
+ * @return float [description]
+ */
+function bvsl_get_koyou_hoken_rate() {
+	global $post;
+	if ( '20221001_after' === $post->salary_target_term ) {
+		$rate = 0.005;
+	} else {
+		$rate = 0.003;
+	}
+	return $rate;
+}
+
+/**
  * 雇用保険料の計算
  *
  * @return [type] [description]
@@ -84,18 +99,14 @@ function bvsl_get_koyou_hoken() {
 	global $post;
 	if ( is_array( $post->salary_koyouhoken ) ) {
 		foreach ( $post->salary_koyouhoken as $key => $value ) {
-			if ( $value == 'not_auto_cal' ) {
+			if ( 'not_auto_cal' === $value ) {
 				return 0;
 			}
 		}
 	}
 	// 稼ぎの合計から雇用保険を引く
 	$koyouhoken_taisyou = bvsl_get_total_earn() + bvsl_format_number( $post->salary_transportation_total );
-	if ( '20221001_after' === $post->salary_target_term ){
-		$rate = 0.005;
-	} else {
-		$rate = 0.003;
-	}
+	$rate               = bvsl_get_koyou_hoken_rate();
 	return $koyou_hoken = round( $koyouhoken_taisyou * $rate );
 }
 /**
