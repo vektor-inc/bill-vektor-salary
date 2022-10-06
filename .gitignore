@@ -8,3 +8,5 @@ dist/
 *.sql
 *.tar.gz
 *.zip
+.wp-env.override.json
+vendor/
