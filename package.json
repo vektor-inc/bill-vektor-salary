@@ -1,13 +1,16 @@
 {
-  "name": "bill-vektor-receipt",
-  "version": "0.1.0",
-  "main": "Gruntfile.js",
-  "author": "YOUR NAME HERE",
-  "devDependencies": {
-    "grunt": "~1.5.3",
-    "grunt-wp-i18n": "~1.0.3",
-    "grunt-wp-readme-to-markdown": "~2.1.0",
-    "gulp": "^4.0.2",
-    "npm-check-updates": "^16.3.16"
-  }
+	"name": "bill-vektor-receipt",
+	"version": "0.1.0",
+	"main": "Gruntfile.js",
+	"author": "Vektor,Inc.",
+	"scripts": {
+		"dist": "rimraf ./dist/ && npx gulp dist && cd dist && zip -r bill-vektor-salary.zip bill-vektor-salary"
+	},
+	"devDependencies": {
+		"grunt": "~1.5.3",
+		"grunt-wp-i18n": "~1.0.3",
+		"grunt-wp-readme-to-markdown": "~2.1.0",
+		"gulp": "^4.0.2",
+		"npm-check-updates": "^16.3.16"
+	}
 }
