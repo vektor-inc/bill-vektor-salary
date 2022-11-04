@@ -24,6 +24,7 @@ function bvsl_format_number( $number = 0 ) {
  */
 function bvsl_format_print( $price ) {
 	$price = bvsl_format_number( $price );
+	var_dump($price);
 	$price = '¥ ' . number_format( $price, 0 );
 	return $price;
 }
