@@ -24,8 +24,9 @@ function bvsl_format_number( $number = 0 ) {
  */
 function bvsl_format_print( $price ) {
 	$price = bvsl_format_number( $price );
-	var_dump($price);
-	$price = '¥ ' . number_format( $price, 0 );
+	if ( is_numeric( $price ) ) {
+		$price = '¥ ' . number_format( $price, 0 );
+	}
 	return $price;
 }
 
@@ -148,7 +149,11 @@ function bvsl_get_koujyo_kazei() {
 function bvsl_get_koujyo_total() {
 	global $post;
 	$total_deduction = bvsl_get_koujyo_kazei();
-	$total_deduction = $total_deduction + bvsl_format_number( $post->salary_jyuuminzei );
-	$total_deduction = $total_deduction + bvsl_format_number( $post->salary_syotokuzei );
+	if ( is_numeric( $post->salary_syotokuzei ) ) {
+		$total_deduction = $total_deduction + bvsl_format_number( $post->salary_jyuuminzei );
+	}
+	if ( is_numeric( $post->salary_syotokuzei ) ) {
+		$total_deduction = $total_deduction + bvsl_format_number( $post->salary_syotokuzei );
+	}
 	return $total_deduction;
 }
