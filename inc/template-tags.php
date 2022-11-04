@@ -149,7 +149,7 @@ function bvsl_get_koujyo_kazei() {
 function bvsl_get_koujyo_total() {
 	global $post;
 	$total_deduction = bvsl_get_koujyo_kazei();
-	if ( is_numeric( $post->salary_syotokuzei ) ) {
+	if ( is_numeric( $post->salary_jyuuminzei ) ) {
 		$total_deduction = $total_deduction + bvsl_format_number( $post->salary_jyuuminzei );
 	}
 	if ( is_numeric( $post->salary_syotokuzei ) ) {
