@@ -5,24 +5,47 @@
  * @package Bill_Vektor_Receipt
  */
 
-$_tests_dir = getenv( 'WP_TESTS_DIR' );
+// Require composer dependencies.
+require_once dirname( dirname( __FILE__ ) ) . '/vendor/autoload.php';
 
-if ( ! $_tests_dir ) {
-	$_tests_dir = rtrim( sys_get_temp_dir(), '/\\' ) . '/wordpress-tests-lib';
+// If we're running in WP's build directory, ensure that WP knows that, too.
+if ( 'build' === getenv( 'LOCAL_DIR' ) ) {
+	define( 'WP_RUN_CORE_TESTS', true );
 }
 
-if ( ! file_exists( $_tests_dir . '/includes/functions.php' ) ) {
-	echo "Could not find $_tests_dir/includes/functions.php, have you run bin/install-wp-tests.sh ?" . PHP_EOL; // WPCS: XSS ok.
-	exit( 1 );
+// Determine the tests directory (from a WP dev checkout).
+// Try the WP_TESTS_DIR environment variable first.
+$_tests_dir = getenv( 'WP_TESTS_DIR' );
+
+// Next, try the WP_PHPUNIT composer package.
+if ( ! $_tests_dir ) {
+	$_tests_dir = getenv( 'WP_PHPUNIT__DIR' );
+}
+
+// See if we're installed inside an existing WP dev instance.
+if ( ! $_tests_dir ) {
+	$_try_tests_dir = dirname( __FILE__ ) . '/../../../../../tests/phpunit';
+	if ( file_exists( $_try_tests_dir . '/includes/functions.php' ) ) {
+		$_tests_dir = $_try_tests_dir;
+	}
+}
+// Fallback.
+if ( ! $_tests_dir ) {
+	$_tests_dir = '/tmp/wordpress-tests-lib';
 }
 
 // Give access to tests_add_filter() function.
 require_once $_tests_dir . '/includes/functions.php';
 
+// Do not try to load JavaScript files from an external URL - this takes a
+// while.
+define( 'GUTENBERG_LOAD_VENDOR_SCRIPTS', false );
+
 /**
  * Manually load the plugin being tested.
  */
 function _manually_load_plugin() {
+	switch_theme('bill-vektor');
 	require dirname( dirname( __FILE__ ) ) . '/bill-vektor-salary.php';
 }
 tests_add_filter( 'muplugins_loaded', '_manually_load_plugin' );
