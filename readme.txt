@@ -14,6 +14,9 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 == Changelog ==
 
+= 0.6.1 =
+所得税欄に数値以外を入れた場合にエラーが表示される不具合を修正
+
 = 0.6 =
 * 令和4年10月稼働分の給与からの雇用保険税率変更対応
 
