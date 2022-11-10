@@ -2,16 +2,18 @@
 /**
  * 計算用数字フォーマットに変換
  *
- * @param  integer $number [description]
- * @return [type]          [description]
+ * @param  integer $number 変換する値
+ * @return number          変換後の値
  */
 function bvsl_format_number( $number = 0 ) {
 	// 全角を半額に変換
 	$number = mb_convert_kana( $number, 'a' );
 	// , が入ってたら除去
 	$number = str_replace( ',', '', $number );
+	// 前後に空白などがあったら除去
+	$number = trim( $number );
 	if ( ! $number ) {
-		$number = 0;
+		$number = (int) 0;
 	}
 	return $number;
 }
@@ -132,7 +134,7 @@ function bvsl_get_kazeisyotoku() {
 /**
  * 課税控除
  *
- * @return [type] 雇用保険 + 健康保険 + 厚生年金
+ * @return number 雇用保険 + 健康保険 + 厚生年金
  */
 function bvsl_get_koujyo_kazei() {
 	global $post;
@@ -141,19 +143,75 @@ function bvsl_get_koujyo_kazei() {
 	$total_deduction = $total_deduction + bvsl_format_number( $post->salary_nenkin );
 	return $total_deduction;
 }
+
+/**
+ * 値が正常なら値を、エラーがあればエラーを返す
+ *
+ * @param array $args 値とエラーの配列
+ * @since 0.6.2
+ * @return string|number $return
+ */
+function bvsl_get_return_array( $args ) {
+	if ( ! empty($args['error']) && is_array( $args['error'] ) ) {
+		$return = '';
+		$count  = 0;
+		foreach ( $args['error'] as $value ) {
+			if ( $count ) {
+				$return .= '<br />';
+			}
+			$return .= $value;
+			$count++;
+		}
+		return $return;
+	} else {
+		return $args['value'];
+	}
+}
+
 /**
  * 控除合計
  *
- * @return [type] [description]
+ * @return number $total_deduction : 課税控除 + 住民税 + 所得税
  */
 function bvsl_get_koujyo_total() {
 	global $post;
-	$total_deduction = bvsl_get_koujyo_kazei();
-	if ( is_numeric( $post->salary_jyuuminzei ) ) {
-		$total_deduction = $total_deduction + bvsl_format_number( $post->salary_jyuuminzei );
+	$args = array(
+		'value' => bvsl_get_koujyo_kazei(),
+		'error' => false,
+	);
+	if ( is_numeric( bvsl_format_number( $post->salary_jyuuminzei ) ) ) {
+		$args['value'] = (int) $args['value'] + bvsl_format_number( $post->salary_jyuuminzei );
+	} else {
+		$args['error'][] = '住民税は数字を入力してください。';
 	}
-	if ( is_numeric( $post->salary_syotokuzei ) ) {
-		$total_deduction = $total_deduction + bvsl_format_number( $post->salary_syotokuzei );
+	if ( is_numeric( bvsl_format_number( $post->salary_syotokuzei ) ) ) {
+		$args['value'] = (int) $args['value'] + bvsl_format_number( $post->salary_syotokuzei );
+	} else {
+		$args['error'][] = '所得税は数字を入力してください。';
 	}
-	return $total_deduction;
+
+	return bvsl_get_return_array( $args );
+}
+
+/**
+ * 差引支給額
+ *
+ * @return number| array
+ */
+function bvsl_get_total_furikomi() {
+	$args = array(
+		'value' => false,
+		'error' => false,
+	);
+	if ( is_numeric( bvsl_get_total_pay() ) && is_numeric( bvsl_get_koujyo_total() ) ) {
+		$args['value'] = bvsl_format_print( bvsl_get_total_pay() - bvsl_get_koujyo_total() );
+
+	}
+	if ( ! is_numeric( bvsl_get_total_pay() ) ) {
+		$args['error'][] = '支給合計が数字でないため算出できません。';
+	}
+	if ( ! is_numeric( bvsl_get_koujyo_total() ) ) {
+		$args['error'][] = '控除合計が数字でないため算出できません。';
+	}
+	return bvsl_get_return_array( $args );
 }
