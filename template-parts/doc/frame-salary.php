@@ -210,7 +210,7 @@ if ( $custom_fields_hikazei ) {
 	</tr>
 	<tr>
 	<th><b>差引支給額</b></th>
-	<td class="price"><b><?php echo bvsl_format_print( bvsl_get_total_pay() - bvsl_get_koujyo_total() ); ?></b></td>
+	<td class="price"><b><?php echo bvsl_get_total_furikomi(); ?></b></td>
 	</tr>
 </tfoot>
 </table>
