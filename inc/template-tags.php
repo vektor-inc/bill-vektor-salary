@@ -132,7 +132,7 @@ function bvsl_get_kazeisyotoku() {
 /**
  * 課税控除
  *
- * @return [type] [description]
+ * @return [type] 雇用保険 + 健康保険 + 厚生年金
  */
 function bvsl_get_koujyo_kazei() {
 	global $post;
