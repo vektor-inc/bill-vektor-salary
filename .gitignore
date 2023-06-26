@@ -10,3 +10,4 @@ dist/
 *.zip
 .wp-env.override.json
 vendor/
+tests/themes/
