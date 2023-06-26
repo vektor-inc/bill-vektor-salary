@@ -4,7 +4,8 @@
 	"main": "Gruntfile.js",
 	"author": "Vektor,Inc.",
 	"scripts": {
-		"dist": "rimraf ./dist/ && npx gulp dist && cd dist && zip -r bill-vektor-salary.zip bill-vektor-salary"
+		"dist": "rimraf ./dist/ && npx gulp dist && cd dist && zip -r bill-vektor-salary.zip bill-vektor-salary",
+		"phpunit": "wp-env run phpunit \"phpunit -c /var/www/html/wp-content/plugins/bill-vektor-salary/phpunit.xml --verbose\""
 	},
 	"devDependencies": {
 		"grunt": "~1.5.3",
