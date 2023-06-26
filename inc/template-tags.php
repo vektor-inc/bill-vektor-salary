@@ -86,7 +86,9 @@ function bvsl_get_total_pay() {
  */
 function bvsl_get_koyou_hoken_rate() {
 	global $post;
-	if ( '20221001_after' === $post->salary_target_term ) {
+	if ( '20230401_after' === $post->salary_target_term ) {
+		$rate = 0.006;
+	} elseif ( '20221001_after' === $post->salary_target_term ) {
 		$rate = 0.005;
 	} else {
 		$rate = 0.003;
@@ -152,7 +154,7 @@ function bvsl_get_koujyo_kazei() {
  * @return string|number $return
  */
 function bvsl_get_return_array( $args ) {
-	if ( ! empty($args['error']) && is_array( $args['error'] ) ) {
+	if ( ! empty( $args['error'] ) && is_array( $args['error'] ) ) {
 		$return = '';
 		$count  = 0;
 		foreach ( $args['error'] as $value ) {

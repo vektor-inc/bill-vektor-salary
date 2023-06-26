@@ -1,4 +1,4 @@
-=== Bill Vektor Receipt ===
+=== BillVektor Salary ===
 Contributors: kurudrive
 Donate link:
 Tags: comments, spam
@@ -14,7 +14,10 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 == Changelog ==
 
- 0.6.2 =
+= 0.7.0 =
+* 令和5年4月稼働分の給与からの雇用保険税率変更対応
+
+= 0.6.2 =
 住民税 / 所得税欄に半角スペースなどが入ると計算から除外される不具合を修正
 
 = 0.6.1 =
