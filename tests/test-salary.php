@@ -84,6 +84,17 @@ class SalaryTest extends WP_UnitTestCase {
 				),
 				'correct'   => 0.005,
 			),
+			array(
+				'post'      => array(
+					'post_title'   => 'Salary Title',
+					'post_content' => 'test',
+					'post_type'    => 'salary',
+				),
+				'post_meta' => array(
+					'salary_target_term' => '20230401_after',
+				),
+				'correct'   => 0.006,
+			),
 		);
 		// var_dump $this->$test_data;
 		foreach ( $test_data as $test_value ) {
@@ -194,6 +205,17 @@ class SalaryTest extends WP_UnitTestCase {
 				),
 				// 300000 * 0.005 + 10000 = 11500
 				'expected'  => 11500,
+			),
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'salary_base'        => '300000',
+					'salary_target_term' => '20230401_after',
+					'salary_jyuuminzei'  => null,
+					'salary_syotokuzei'  => 10000,
+				),
+				// 300000 * 0.006 + 10000 = 11800
+				'expected'  => 11800,
 			),
 			array(
 				'post'      => $dummy_post,
