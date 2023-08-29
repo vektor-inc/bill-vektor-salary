@@ -15,17 +15,17 @@ if ( $post->salary_document_name ) {
 <?php if ( $post->salary_staff ) : ?>
 <h2 class="bill-destination">
 <span class="bill-destination-client">
-<?php echo esc_html( get_the_title( $post->salary_staff ) ); ?>
+	<?php echo esc_html( get_the_title( $post->salary_staff ) ); ?>
 </span>
 <span class="bill-destination-honorific">
-<?php
-// $client_honorific = esc_html( get_post_meta( $post->salary_staff, 'client_honorific', true ) );
-// if ( $client_honorific ) {
-// echo $client_honorific;
-// } else {
+	<?php
+	// $client_honorific = esc_html( get_post_meta( $post->salary_staff, 'client_honorific', true ) );
+	// if ( $client_honorific ) {
+	// echo $client_honorific;
+	// } else {
 	echo '様';
-// }
-?>
+	// }
+	?>
 </span>
 </h2>
 <?php endif; ?>
@@ -127,33 +127,53 @@ $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_kazei_array();
 $custom_fields_kazei = VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
 if ( $custom_fields_kazei ) {
 	echo '<thead class="thead-dark">';
-	echo '<tr><th colspan="2">その他支給（課税対象）</th></tr>';
+	echo '<tr><th colspan="2">その他支給・控除（課税対象）</th></tr>';
 	echo '<thead>';
 	echo '<tbody>';
 	echo $custom_fields_kazei;
 	echo '</tbody>';
 }
 
-$custom_fields_array   = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
-$custom_fields_hikazei = VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
-if ( $custom_fields_hikazei ) {
-	echo '<thead class="thead-dark">';
-	echo '<tr><th colspan="2">その他支給（非課税）</th></tr>';
-	echo '<thead>';
-	echo '<tbody>';
-	echo $custom_fields_hikazei;
-	echo '</tbody>';
-}
 ?>
-
-		</tbody>
 		<tfoot>
 		<tr>
-			<th>支給合計</th>
-			<td class="price"><?php echo bvsl_format_print( bvsl_get_total_pay() ); ?></td>
+			<th>課税支給合計</th>
+			<td class="price"><?php echo bvsl_format_print( bvsl_get_total_pay( array( 'kazei' => true ) ) ); ?></td>
 		</tr>
-	</tfoot>
-	</table>
+		</tfoot>
+</table>
+
+<?php
+/***** 社会保険料 ***************************************************** */
+?>
+<table class="table table-bordered table-bill">
+<thead>
+	<tr>
+		<th colspan="2">社会保険料</th>
+	</tr>
+</thead>
+<tbody>
+	<tr>
+		<th>健康保険</th>
+		<td class="price"><?php echo bvsl_format_print( $post->salary_kenkou ); ?></td>
+	</tr>
+	<tr>
+		<th>厚生年金</th>
+		<td class="price"><?php echo bvsl_format_print( $post->salary_nenkin ); ?></td>
+	</tr>
+	<tr>
+		<th>雇用保険</th>
+		<td class="price"><?php echo bvsl_format_print( bvsl_get_koyou_hoken() ); ?></td>
+	</tr>
+</tbody>
+<tfoot>
+	<tr>
+	<th>社会保険料合計</th>
+	<td class="price"><?php echo bvsl_format_print( bvsl_get_shakai_hoken_total() ); ?></td>
+	</tr>
+</tfoot>
+</table>
+
 </div><!-- [ /.col-xs-6 ] -->
 
 <?php
@@ -165,30 +185,42 @@ if ( $custom_fields_hikazei ) {
 <?php
 // include( 'test-display.php' );
 ?>
+
+
+
+<table class="table table-bordered table-bill">
+<thead>
+	<tr>
+		<th colspan="2">所得税</th>
+	</tr>
+</thead>
+<tbody>
+	<tr>
+	<th>課税対象額（ 課税支給合計 - 社会保険料合計 ）</th>
+	<td class="price"><b><?php echo bvsl_format_print( bvsl_get_kazeisyotoku() ); ?></b></td>
+	</tr>
+	<tr>
+		<th><b>所得税</b></th>
+		<td class="price"><b><?php echo bvsl_format_print( $post->salary_syotokuzei ); ?></b></td>
+	</tr>
+</tbody>
+<tfoot>
+
+</tfoot>
+</table>
+
 <table class="table table-bordered table-bill">
 	<thead>
 		<th colspan="2">控除額</th>
 	</thead>
 <tbody>
-	<?php
-	// $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_koujyo_kazei_array();
-	// echo VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
-	?>
 	<tr>
-		<th>雇用保険</th>
-		<td class="price"><?php echo bvsl_format_print( bvsl_get_koyou_hoken() ); ?></td>
+		<th>社会保険料合計</th>
+		<td class="price"><?php echo bvsl_format_print( bvsl_get_shakai_hoken_total() ); ?></td>
 	</tr>
 	<tr>
-		<th>健康保険</th>
-		<td class="price"><?php echo bvsl_format_print( $post->salary_kenkou ); ?></td>
-	</tr>
-	<tr>
-		<th>厚生年金</th>
-		<td class="price"><?php echo bvsl_format_print( $post->salary_nenkin ); ?></td>
-	</tr>
-	<tr>
-		<th>所得税</th>
-		<td class="price"><?php echo bvsl_format_print( $post->salary_syotokuzei ); ?></td>
+	<th>所得税</th>
+	<td class="price"><?php echo bvsl_format_print( $post->salary_syotokuzei ); ?></td>
 	</tr>
 	<tr>
 		<th>住民税</th>
@@ -204,14 +236,56 @@ if ( $custom_fields_hikazei ) {
 	<th>控除合計</th>
 	<td class="price"><?php echo bvsl_format_print( bvsl_get_koujyo_total() ); ?></td>
 	</tr>
-	<tr>
-	<th><b>課税対象額<b></th>
-	<td class="price"><b><?php echo bvsl_format_print( bvsl_get_kazeisyotoku() ); ?></b></td>
-	</tr>
-	<tr>
-	<th><b>差引支給額</b></th>
-	<td class="price"><b><?php echo bvsl_get_total_furikomi(); ?></b></td>
-	</tr>
+</tfoot>
+</table>
+
+<?php
+/***** 非課税支給合計 ***************************************************** */
+
+$custom_fields_array   = Salary_Table_Custom_Fields::custom_fields_hikazei_array();
+$custom_fields_hikazei = VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
+if ( $custom_fields_hikazei ) { ?>
+<table class="table table-bordered table-bill">
+<thead class="thead-dark">
+<tr><th colspan="2">その他支給・控除（非課税）</th></tr>
+<thead>
+<tbody>
+	<?php echo $custom_fields_hikazei; ?>
+</tbody>
+<tfoot>
+<tr>
+	<th>非課税支給・控除合計</th>
+	<td class="price"><?php echo bvsl_format_print( bvsl_get_hikazei_additional_total() ); ?></td>
+</tr>
+</tfoot>
+</table>
+<?php } ?>
+
+<?php
+/***** 差し引き支給合計 ***************************************************** */ ?>
+<table class="table table-bordered table-bill">
+<thead class="thead-dark">
+<tr><th colspan="2">差引支給</th></tr>
+<thead>
+<tbody>
+<tr>
+<th>課税支給合計</th>
+<td class="price"><?php echo bvsl_format_print( bvsl_get_total_pay( array( 'kazei' => true ) ) ); ?></td>
+</tr>
+<tr>
+<th>控除合計</th>
+<td class="price"><?php echo bvsl_format_print( bvsl_get_koujyo_total() ); ?></td>
+</tr>
+<tr>
+	<th>非課税支給・控除合計</th>
+	<td class="price"><?php echo bvsl_format_print( bvsl_get_hikazei_additional_total() ); ?></td>
+</tr>
+</tbody>
+<tfoot>
+<tr>
+<th><b>差引支給額</b></th>
+<td class="price"><b><?php echo bvsl_get_total_furikomi(); ?></b></td>
+</tr>
 </tfoot>
 </table>
 
@@ -222,7 +296,7 @@ if ( $custom_fields_hikazei ) {
 <dl class="bill-remarks">
 <dt>備考</dt>
 <dd>
-<?php echo apply_filters( 'the_content', $post->salary_remarks ); ?>
+	<?php echo apply_filters( 'the_content', $post->salary_remarks ); ?>
 </dd>
 </dl>
 <?php endif; ?>

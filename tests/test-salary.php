@@ -5,8 +5,6 @@
  * @package Bill_Vektor_Salary
  */
 
- // テーマ側から 'npm run phpunit:salary' を実行する
-
 class SalaryTest extends WP_UnitTestCase {
 
 	/**
@@ -282,26 +280,283 @@ class SalaryTest extends WP_UnitTestCase {
 
 		$test_data = array(
 			array(
-				'value'      => 1000,
-				'error' => false,
-				'expected'  => 1000,
+				'value'    => 1000,
+				'error'    => false,
+				'expected' => 1000,
 			),
 			array(
-				'value'      => 1000,
-				'error' => array(
+				'value'    => 1000,
+				'error'    => array(
 					'エラーA',
 					'エラーB',
 				),
-				'expected'  => 'エラーA<br />エラーB',
+				'expected' => 'エラーA<br />エラーB',
 			),
 		);
 		// var_dump $this->$test_data;
 		foreach ( $test_data as $test_value ) {
-			$actual = bvsl_get_return_array(  $test_value );
+			$actual = bvsl_get_return_array( $test_value );
 			print PHP_EOL;
 			print 'actual  :' . $actual . PHP_EOL;
 			print 'expected :' . $test_value['expected'] . PHP_EOL;
 			$this->assertEquals( $test_value['expected'], $actual );
 		}
 	}
+
+	/**
+	 * @since 0.8.0
+	 */
+	function test_bvsl_get_shakai_hoken_total() {
+		print PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+		print 'bvsl_get_shakai_hoken_total' . PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+
+		$dummy_post = array(
+			'post_title'   => 'Salary Title',
+			'post_content' => 'test',
+			'post_type'    => 'salary',
+		);
+		$test_data  = array(
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'salary_base'        => '300000',
+					'salary_target_term' => '20230401_after',
+					'salary_kenkou'      => '20000',
+					'salary_nenkin'      => '20000',
+				),
+				// 300000 * 0.006 = 1800
+				'expected'  => 40000 + 1800,
+			),
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'salary_base'        => '300000',
+					'salary_target_term' => '20230401_after',
+					'salary_kenkou'      => '20000',
+					'salary_nenkin'      => null,
+				),
+				// 300000 * 0.006 = 1800
+				'expected'  => 20000 + 1800,
+			),
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'salary_base'        => '300000',
+					'salary_target_term' => '20230401_after',
+					'salary_kenkou'      => '20000',
+					'salary_nenkin'      => '２００００',
+				),
+				// 300000 * 0.006 = 1800
+				'expected'  => 40000 + 1800,
+			),
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'salary_base'                 => '300000',
+					'salary_target_term'          => '20230401_after',
+					'salary_kenkou'               => '20000',
+					'salary_nenkin'               => '２００００',
+					'salary_transportation_total' => '１０００００',
+				),
+				// 400000 * 0.006 = 2400
+				'expected'  => 40000 + 2400,
+			),
+
+		);
+
+		foreach ( $test_data as $test_value ) {
+			$post_id = wp_insert_post( $test_value['post'] );
+			if ( is_int( $post_id ) ) {
+				if ( ! empty( $test_value['post_meta'] ) ) {
+					foreach ( $test_value['post_meta'] as $meta_key => $meta_value ) {
+						update_post_meta( $post_id, $meta_key, $meta_value );
+					}
+				}
+			}
+			global $post;
+			$post = get_post( $post_id );
+			setup_postdata( $post );
+			$actual = bvsl_get_shakai_hoken_total();
+			print PHP_EOL;
+
+			print 'actual  :' . $actual . PHP_EOL;
+			print 'expected :' . $test_value['expected'] . PHP_EOL;
+			$this->assertEquals( $test_value['expected'], $actual );
+			wp_delete_post( $post_id, true );
+			$post_id = 0;
+		}
+	}
+
+
+	/**
+	 * @since 0.8.0
+	 */
+	function test_bvsl_get_hikazei_additional_total() {
+		print PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+		print 'bvsl_get_hikazei_additional_total' . PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+
+		$dummy_post = array(
+			'post_title'   => 'Salary Title',
+			'post_content' => 'test',
+			'post_type'    => 'salary',
+		);
+		$test_data  = array(
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'hikazei_additional' => array(
+						array(
+							'name'  => 'test',
+							'price' => '1000',
+						),
+						array(
+							'name'  => 'test',
+							'price' => '2000',
+						),
+					),
+				),
+				'expected'  => 3000,
+			),
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'hikazei_additional' => array(
+						array(
+							'name'  => 'test',
+							'price' => '1000',
+						),
+						array(
+							'name'  => 'test',
+							'price' => '３，000',
+						),
+					),
+				),
+				'expected'  => 4000,
+			),
+		);
+
+		foreach ( $test_data as $test_value ) {
+			$post_id = wp_insert_post( $test_value['post'] );
+			if ( is_int( $post_id ) ) {
+				if ( ! empty( $test_value['post_meta'] ) ) {
+					foreach ( $test_value['post_meta'] as $meta_key => $meta_value ) {
+						update_post_meta( $post_id, $meta_key, $meta_value );
+					}
+				}
+			}
+			global $post;
+			$post = get_post( $post_id );
+			setup_postdata( $post );
+			$actual = bvsl_get_hikazei_additional_total();
+			print PHP_EOL;
+
+			print 'actual  :' . $actual . PHP_EOL;
+			print 'expected :' . $test_value['expected'] . PHP_EOL;
+			$this->assertEquals( $test_value['expected'], $actual );
+			wp_delete_post( $post_id, true );
+			$post_id = 0;
+		}
+	}
+
+	/**
+	 * @since 0.8.0
+	 */
+	function test_bvsl_get_total_pay() {
+		print PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+		print 'bvsl_get_total_pay' . PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+
+		$dummy_post = array(
+			'post_title'   => 'Salary Title',
+			'post_content' => 'test',
+			'post_type'    => 'salary',
+		);
+		$test_data  = array(
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'salary_base'        => '300000',
+					'kazei_additional' => array(
+						array(
+							'name'  => 'test',
+							'price' => '1000',
+						),
+					),
+				),
+				'expected'  => 301000,
+			),
+			// 通常非課税も含まれる（初期構築時はこの仕様だった）
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'salary_base'        => '300000',
+					'kazei_additional' => array(
+						array(
+							'name'  => 'test',
+							'price' => '1000',
+						),
+					),
+					'hikazei_additional' => array(
+						array(
+							'name'  => 'test',
+							'price' => '1000',
+						),
+					),
+				),
+				'expected'  => 302000,
+			),
+			// kazei を true にすると非課税を含めない
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'salary_base'        => '300000',
+					'kazei_additional' => array(
+						array(
+							'name'  => 'test',
+							'price' => '1000',
+						),
+					),
+					'hikazei_additional' => array(
+						array(
+							'name'  => 'test',
+							'price' => '1000',
+						),
+					),
+				),
+				'kazei' => true,
+				'expected'  => 301000,
+			),
+		);
+		foreach ( $test_data as $test_value ) {
+			$post_id = wp_insert_post( $test_value['post'] );
+			if ( is_int( $post_id ) ) {
+				if ( ! empty( $test_value['post_meta'] ) ) {
+					foreach ( $test_value['post_meta'] as $meta_key => $meta_value ) {
+						update_post_meta( $post_id, $meta_key, $meta_value );
+					}
+				}
+			}
+			global $post;
+			$post = get_post( $post_id );
+			setup_postdata( $post );
+			$args = array();
+			if ( ! empty ( $test_value['kazei'] ) ){
+				$args['kazei'] = true;
+			}
+			$actual = bvsl_get_total_pay( $args );
+			print PHP_EOL;
+
+			print 'actual  :' . $actual . PHP_EOL;
+			print 'expected :' . $test_value['expected'] . PHP_EOL;
+			$this->assertEquals( $test_value['expected'], $actual );
+			wp_delete_post( $post_id, true );
+			$post_id = 0;
+		}
+	}
+
 }
