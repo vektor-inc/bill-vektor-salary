@@ -4,7 +4,7 @@ Donate link:
 Tags: comments, spam
 Requires at least: 4.5
 Tested up to: 6.2
-Stable tag: 0.7.0
+Stable tag: 0.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,6 +13,9 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 
 == Changelog ==
+
+= 0.8.0 =
+* 課税支給額合計と非課税支給・控除がわかりやすいように構成変更
 
 = 0.7.0 =
 * 令和5年4月稼働分の給与からの雇用保険税率変更対応

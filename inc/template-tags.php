@@ -60,23 +60,40 @@ function bvsl_get_total_earn( $post = '' ) {
 
 /**
  * 交通費込の総支給額
- *
+ * @param  string $args = [
+ * 	'kazei' => true, // 課税のみの場合
+ * ]
  * @return [type] [description]
  */
-function bvsl_get_total_pay() {
+function bvsl_get_total_pay( $args = array() ) {
 	global $post;
 	$total_pay = bvsl_get_total_earn( $post );
 	$total_pay = $total_pay + bvsl_format_number( $post->salary_transportation_total );
 
+	// 非課税も含める場合（古い仕様）
+	if ( empty( $args[ 'kazei' ] ) ){
+		$total_pay = $total_pay + bvsl_get_hikazei_additional_total();
+	}
+	return $total_pay;
+}
+
+/**
+ * 非課税支給の合計
+ * 
+ * @since 0.8.0
+ * @return number
+ */
+function bvsl_get_hikazei_additional_total() {
+	$hikazei_additional_total = 0;
+	global $post;
 	if ( is_array( $post->hikazei_additional ) ) {
 		foreach ( $post->hikazei_additional as $key => $value ) {
 			if ( ! empty( $value['price'] ) ) {
-				$total_pay = $total_pay + bvsl_format_number( $value['price'] );
+				$hikazei_additional_total = $hikazei_additional_total + bvsl_format_number( $value['price'] );
 			}
 		}
 	}
-
-	return $total_pay;
+	return $hikazei_additional_total;
 }
 
 /**
@@ -98,6 +115,7 @@ function bvsl_get_koyou_hoken_rate() {
 
 /**
  * 雇用保険料の計算
+ * 雇用保険 = ( 稼ぎの合計 + 通勤交通費 ) * 雇用保険料率
  *
  * @return [type] [description]
  */
@@ -110,7 +128,6 @@ function bvsl_get_koyou_hoken() {
 			}
 		}
 	}
-	// 稼ぎの合計から雇用保険を引く
 	$koyouhoken_taisyou = bvsl_get_total_earn() + bvsl_format_number( $post->salary_transportation_total );
 	$rate               = bvsl_get_koyou_hoken_rate();
 	return $koyou_hoken = round( $koyouhoken_taisyou * $rate );
@@ -193,6 +210,16 @@ function bvsl_get_koujyo_total() {
 	}
 
 	return bvsl_get_return_array( $args );
+}
+
+/**
+ * 社会保険料合計
+ * 健康保険（介護保険含む）+ 厚生年金保険 + 雇用保険（労災含む）
+ */
+function bvsl_get_shakai_hoken_total(){
+	global $post;
+	$shakai_hoken_total = bvsl_format_number( $post->salary_kenkou ) + bvsl_format_number( $post->salary_nenkin ) + bvsl_get_koyou_hoken();
+	return $shakai_hoken_total;
 }
 
 /**
