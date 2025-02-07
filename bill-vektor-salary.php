@@ -179,11 +179,16 @@ add_action(
 		if ( is_admin() || ! $query->is_main_query() ) {
 			return;
 		}
-		// 支給分アーカイブで、スタッフ番号順になるように書き換え
-		// 支給分アーカイブで、全件表示になるように書き換え
+		// 支給分アーカイブで、スタッフ番号順 + 同じ番号なら日付が古い順にする
 		if ( $query->is_tax( 'salary-term' ) ) {
 			$query->set( 'meta_key', 'salary_staff_number' );
-			$query->set( 'orderby', 'meta_value' );
+			$query->set(
+				'orderby',
+				array(
+					'meta_value' => 'ASC',
+					'date'       => 'ASC',
+				)
+			);
 			$query->set( 'order', 'ASC' );
 			$query->set( 'posts_per_page', -1 );
 		}
