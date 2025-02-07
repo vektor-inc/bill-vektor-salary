@@ -12,12 +12,12 @@
  * @package         Bill_Vektor_Salary
  */
 
- /*
-	 テーマがBillVektorじゃない時は誤動作防止のために読み込ませない
- --------------------------------------------- */
+/*
+	テーマがBillVektorじゃない時は誤動作防止のために読み込ませない
+--------------------------------------------- */
 add_action(
 	'after_setup_theme',
-	function() {
+	function () {
 		if ( ! function_exists( 'bill_get_post_type' ) ) {
 			// 読み込まずに終了
 			return;
@@ -25,10 +25,10 @@ add_action(
 	}
 );
 
- /*
-  ---------------------------------------------
-	 updater
- --------------------------------------------- */
+/*
+	---------------------------------------------
+	updater
+--------------------------------------------- */
 require 'inc/plugin-update-checker/plugin-update-checker.php';
 $myUpdateChecker = Puc_v4_Factory::buildUpdateChecker(
 	'https://github.com/vektor-inc/bill-vektor-salary',
@@ -175,7 +175,7 @@ function bvsl_title_auto_save() {
 --------------------------------------------- */
 add_action(
 	'pre_get_posts',
-	function( $query ) {
+	function ( $query ) {
 		if ( is_admin() || ! $query->is_main_query() ) {
 			return;
 		}
