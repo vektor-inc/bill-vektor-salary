@@ -72,8 +72,6 @@ jobs:
               run: npm run wp-env run cli wp core version
             - name: Install Themes
               run: bash bin/install-theme.sh
-            - name: Build
-              run: npm run build
             - name: Change Permittion
               run: sudo chmod -R 777 ~/wp-env
             - name: Run PHP Unit Test
@@ -103,8 +101,6 @@ jobs:
                   curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
                   chmod +x wp-cli.phar
                   mv wp-cli.phar /usr/local/bin/wp
-            - name: Build
-              run: npm run build
             - name: Make Distribution
               run: |
                   npm run dist
@@ -145,8 +141,6 @@ jobs:
                   curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
                   chmod +x wp-cli.phar
                   mv wp-cli.phar /usr/local/bin/wp
-            - name: Build
-              run: npm run build
             - name: Make Distribution
               # "npm run dist" の中で composer install --no-dev & npx gulp dist してるが、毎回「ちゃんと --no-dev 処理されてるのか？」と心配になるので直書きに変更
               run: |
