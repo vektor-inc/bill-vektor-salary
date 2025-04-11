@@ -10,4 +10,5 @@ dist/
 *.zip
 .wp-env.override.json
 vendor/
-tests/themes/
+temp/
+.phpunit.result.cache

@@ -103,12 +103,14 @@ function bvsl_get_hikazei_additional_total() {
  */
 function bvsl_get_koyou_hoken_rate() {
 	global $post;
-	if ( '20230401_after' === $post->salary_target_term ) {
-		$rate = 0.006;
+	if ( '20250401_after' === $post->salary_target_term ) {
+		$rate = 5.5 / 1000;
+	} elseif ( '20230401_after' === $post->salary_target_term ) {
+		$rate = 6 / 1000;
 	} elseif ( '20221001_after' === $post->salary_target_term ) {
-		$rate = 0.005;
+		$rate = 5 / 1000;
 	} else {
-		$rate = 0.003;
+		$rate = 3 / 1000;
 	}
 	return $rate;
 }

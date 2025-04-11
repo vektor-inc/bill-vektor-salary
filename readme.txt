@@ -14,6 +14,8 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 == Changelog ==
 
+* 2025年（令和７年）04月01以降の雇用保険改定に対応
+
 = 0.9.0 =
 * アーカイブページで社員番号が同じ場合は昇順でならぶように変更
 

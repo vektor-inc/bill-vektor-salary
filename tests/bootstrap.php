@@ -47,7 +47,7 @@ define( 'GUTENBERG_LOAD_VENDOR_SCRIPTS', false );
 function _manually_load_plugin() {
 	// bin/install-theme.sh で tests/themes/ に bill-vektor をインストールしている.
 	// ローカルでプラグインから wp-env 起動して npm run phpunit する場合は事前に bin/install-theme.sh を叩く.
-	register_theme_directory( dirname( __FILE__ ) . '/themes' );
+	register_theme_directory( dirname( dirname( __FILE__ ) ) . '/temp/themes' );
 	search_theme_directories();
 	switch_theme('bill-vektor');
 	require dirname( dirname( __FILE__ ) ) . '/bill-vektor-salary.php';
