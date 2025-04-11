@@ -4,6 +4,7 @@
 	"main": "Gruntfile.js",
 	"author": "Vektor,Inc.",
 	"scripts": {
+		"wp-env": "wp-env",
 		"dist": "rimraf ./dist/ && npx gulp dist && cd dist && zip -r bill-vektor-salary.zip bill-vektor-salary",
 		"phpunit": "wp-env run tests-cli --env-cwd='wp-content/plugins/bill-vektor-salary' vendor/bin/phpunit -c .phpunit.xml --verbose"
 	},

@@ -223,7 +223,7 @@ class SalaryTest extends WP_UnitTestCase {
 					'salary_jyuuminzei'  => null,
 					'salary_syotokuzei'  => 10000,
 				),
-				// 300000 * 5.5 / 1000 + 10000 = 11650
+				// 300000 * ( 5.5 / 1000 ) + 10000 = 11650
 				'expected'  => 11650,
 			),
 			array(
