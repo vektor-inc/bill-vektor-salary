@@ -219,6 +219,17 @@ class SalaryTest extends WP_UnitTestCase {
 				'post'      => $dummy_post,
 				'post_meta' => array(
 					'salary_base'        => '300000',
+					'salary_target_term' => '20250401_after',
+					'salary_jyuuminzei'  => null,
+					'salary_syotokuzei'  => 10000,
+				),
+				// 300000 * ( 5.5 / 1000 ) + 10000 = 11650
+				'expected'  => 11650,
+			),
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'salary_base'        => '300000',
 					'salary_target_term' => '20221001_after',
 					'salary_jyuuminzei'  => '文字列を入れられてしまった',
 					'salary_syotokuzei'  => null,

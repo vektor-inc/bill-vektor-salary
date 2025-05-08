@@ -236,6 +236,7 @@ class Salary_Table_Custom_Fields {
 					'20220930_before' => '〜令和4年9月30日',
 					'20221001_after' => '令和4年10月1日〜',
 					'20230401_after' => '令和5年4月1日〜',
+					'20250401_after' => '令和7年4月1日〜',
 				),
 				'required'    => true,
 			),

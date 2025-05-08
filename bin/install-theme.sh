@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-mkdir -p tests/themes
+mkdir -p temp/themes
 
 # ディレクトリに移動
-cd tests/themes
+cd temp/themes
 
 # リポジトリをクローン
 git clone https://github.com/vektor-inc/bill-vektor.git
