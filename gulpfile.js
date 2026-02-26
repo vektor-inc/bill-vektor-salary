@@ -9,6 +9,7 @@ gulp.task('dist', function() {
 				'./**/*.txt',
 				'./**/*.css',
 				'./**/*.scss',
+				'./**/*.js',
 				'./**/*.bat',
 				'./**/*.rb',
 				'./**/*.eot',
