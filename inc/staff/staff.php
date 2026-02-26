@@ -60,6 +60,7 @@ function bill_staff_posts_columns( $columns ) {
 			$new_columns['salary_staff_status'] = 'スタッフステータス';
 			$new_columns['salary_fuyou']        = '税扶養人数';
 			$new_columns['salary_kenkou_hifuyousya'] = '健康保険被扶養人数';
+			$new_columns['salary_birthday']     = '生年月日';
 		}
 	}
 
@@ -124,7 +125,17 @@ function bill_staff_posts_custom_column( $column_name, $post_id ) {
 		return;
 	}
 
-	if ( 'salary_staff_status' !== $column_name && 'salary_fuyou' !== $column_name && 'salary_kenkou_hifuyousya' !== $column_name ) {
+	if ( 'salary_birthday' === $column_name ) {
+		$salary_birthday = get_post_meta( $post_id, 'salary_birthday', true );
+		if ( '' === $salary_birthday ) {
+			echo '-';
+		} else {
+			echo esc_html( $salary_birthday );
+		}
+		return;
+	}
+
+	if ( 'salary_staff_status' !== $column_name && 'salary_fuyou' !== $column_name && 'salary_kenkou_hifuyousya' !== $column_name && 'salary_birthday' !== $column_name ) {
 		echo '-';
 	}
 }

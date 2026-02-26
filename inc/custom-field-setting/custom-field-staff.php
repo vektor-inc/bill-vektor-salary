@@ -75,6 +75,13 @@ class Staff_Custom_Fields {
 				'required'    => false,
 				'sanitize'    => 'sanitize_text_field',
 			),
+			'salary_birthday'                => array(
+				'label'       => '生年月日',
+				'type'        => 'text',
+				'description' => 'YYYY-MM-DD 形式で入力してください。',
+				'required'    => false,
+				'sanitize'    => 'bvsl_sanitize_staff_birthday',
+			),
 			'salary_base'                    => array(
 				'label'       => '基本給',
 				'type'        => 'text',
@@ -132,3 +139,29 @@ class Staff_Custom_Fields {
 
 }
 Staff_Custom_Fields::init();
+
+/**
+ * スタッフ生年月日を年齢計算しやすい YYYY-MM-DD 形式に整える。
+ *
+ * @param string $value 入力値。
+ * @return string YYYY-MM-DD 形式の値。無効な値は空文字を返す。
+ */
+function bvsl_sanitize_staff_birthday( $value ) {
+	$value = sanitize_text_field( $value );
+
+	if ( '' === $value ) {
+		return '';
+	}
+
+	// 生年月日は年齢計算で扱えるよう YYYY-MM-DD のみ許可する。
+	if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $value ) ) {
+		return '';
+	}
+
+	list( $year, $month, $day ) = array_map( 'intval', explode( '-', $value ) );
+	if ( ! checkdate( $month, $day, $year ) ) {
+		return '';
+	}
+
+	return sprintf( '%04d-%02d-%02d', $year, $month, $day );
+}
