@@ -75,6 +75,29 @@ class Staff_Custom_Fields {
 				'required'    => false,
 				'sanitize'    => 'sanitize_text_field',
 			),
+			'salary_base'                    => array(
+				'label'       => '基本給',
+				'type'        => 'text',
+				'description' => '',
+				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
+			),
+			'salary_transportation_total'    => array(
+				'label'       => '交通費',
+				'type'        => 'text',
+				'description' => '',
+				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
+			),
+			'salary_koyouhoken'              => array(
+				'label'       => '雇用保険',
+				'type'        => 'checkbox',
+				'description' => '未チェックの場合は自動計算されます。雇用保険対象外の場合はチェックしてください。',
+				'options'     => array(
+					'not_auto_cal' => '自動計算しない',
+				),
+				'required'    => false,
+			),
 			'salary_transfer_account_bank'   => array(
 				'label'       => '振込銀行名',
 				'type'        => 'text',

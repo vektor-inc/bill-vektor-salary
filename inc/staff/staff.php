@@ -91,6 +91,14 @@ function bill_staff_posts_custom_column( $column_name, $post_id ) {
 
 		echo '<span class="bill-staff-status-value" style="display:none;">' . esc_html( $status ) . '</span>';
 		echo '<span class="bill-staff-kenkou-hifuyousya-value" style="display:none;">' . esc_html( get_post_meta( $post_id, 'salary_kenkou_hifuyousya', true ) ) . '</span>';
+		echo '<span class="bill-staff-base-value" style="display:none;">' . esc_html( get_post_meta( $post_id, 'salary_base', true ) ) . '</span>';
+		echo '<span class="bill-staff-transportation-value" style="display:none;">' . esc_html( get_post_meta( $post_id, 'salary_transportation_total', true ) ) . '</span>';
+		$koyou_hoken = get_post_meta( $post_id, 'salary_koyouhoken', true );
+		$koyou_hoken_checked = '0';
+		if ( is_array( $koyou_hoken ) && in_array( 'not_auto_cal', $koyou_hoken, true ) ) {
+			$koyou_hoken_checked = '1';
+		}
+		echo '<span class="bill-staff-koyouhoken-value" style="display:none;">' . esc_html( $koyou_hoken_checked ) . '</span>';
 		return;
 	}
 
@@ -153,6 +161,18 @@ function bill_staff_quick_edit_custom_box( $column_name, $post_type ) {
 				<span class="title">健康保険被扶養人数</span>
 				<input type="number" min="0" step="1" name="salary_kenkou_hifuyousya" value="" />
 			</label>
+			<label class="inline-edit-group">
+				<span class="title">基本給</span>
+				<input type="text" name="salary_base" value="" />
+			</label>
+			<label class="inline-edit-group">
+				<span class="title">交通費</span>
+				<input type="text" name="salary_transportation_total" value="" />
+			</label>
+			<label class="inline-edit-group">
+				<input type="checkbox" name="salary_koyouhoken[]" value="not_auto_cal" />
+				<span class="checkbox-title">雇用保険: 自動計算しない</span>
+			</label>
 		</div>
 	</fieldset>
 	<?php
@@ -191,10 +211,16 @@ function bill_staff_quick_edit_script() {
 			var status = $postRow.find('.column-salary_staff_status .bill-staff-status-value').text();
 			var fuyou = $postRow.find('.column-salary_fuyou .bill-staff-fuyou-value').text();
 			var kenkouHifuyousya = $postRow.find('.column-salary_staff_status .bill-staff-kenkou-hifuyousya-value').text();
+			var salaryBase = $postRow.find('.column-salary_staff_status .bill-staff-base-value').text();
+			var salaryTransportationTotal = $postRow.find('.column-salary_staff_status .bill-staff-transportation-value').text();
+			var koyouHoken = $postRow.find('.column-salary_staff_status .bill-staff-koyouhoken-value').text();
 
 			$editRow.find('select[name=\"salary_staff_status\"]').val(status);
 			$editRow.find('input[name=\"salary_fuyou\"]').val(fuyou);
 			$editRow.find('input[name=\"salary_kenkou_hifuyousya\"]').val(kenkouHifuyousya);
+			$editRow.find('input[name=\"salary_base\"]').val(salaryBase);
+			$editRow.find('input[name=\"salary_transportation_total\"]').val(salaryTransportationTotal);
+			$editRow.find('input[name=\"salary_koyouhoken[]\"]').prop('checked', koyouHoken === '1');
 		};
 	})(jQuery);
 	</script>
@@ -273,8 +299,41 @@ function bill_staff_save_quick_edit_status( $post_id, $post ) {
 
 	if ( '' === $kenkou_hifuyousya ) {
 		delete_post_meta( $post_id, 'salary_kenkou_hifuyousya' );
+	} else {
+		update_post_meta( $post_id, 'salary_kenkou_hifuyousya', $kenkou_hifuyousya );
+	}
+
+	$salary_base = '';
+	if ( isset( $_POST['salary_base'] ) ) {
+		$salary_base = sanitize_text_field( wp_unslash( $_POST['salary_base'] ) );
+	}
+
+	if ( '' === $salary_base ) {
+		delete_post_meta( $post_id, 'salary_base' );
+	} else {
+		update_post_meta( $post_id, 'salary_base', $salary_base );
+	}
+
+	$salary_transportation_total = '';
+	if ( isset( $_POST['salary_transportation_total'] ) ) {
+		$salary_transportation_total = sanitize_text_field( wp_unslash( $_POST['salary_transportation_total'] ) );
+	}
+
+	if ( '' === $salary_transportation_total ) {
+		delete_post_meta( $post_id, 'salary_transportation_total' );
+	} else {
+		update_post_meta( $post_id, 'salary_transportation_total', $salary_transportation_total );
+	}
+
+	$koyou_hoken = array();
+	if ( isset( $_POST['salary_koyouhoken'] ) && is_array( $_POST['salary_koyouhoken'] ) ) {
+		$koyou_hoken = array_map( 'sanitize_text_field', wp_unslash( $_POST['salary_koyouhoken'] ) );
+	}
+
+	if ( in_array( 'not_auto_cal', $koyou_hoken, true ) ) {
+		update_post_meta( $post_id, 'salary_koyouhoken', array( 'not_auto_cal' ) );
 		return;
 	}
 
-	update_post_meta( $post_id, 'salary_kenkou_hifuyousya', $kenkou_hifuyousya );
+	delete_post_meta( $post_id, 'salary_koyouhoken' );
 }
