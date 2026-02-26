@@ -184,7 +184,7 @@ class Salary_Table_Custom_Fields {
 				'required'    => false,
 			),
 			'salary_fuyou'                => array(
-				'label'       => '扶養人数',
+				'label'       => '税扶養人数',
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
