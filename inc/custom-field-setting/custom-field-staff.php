@@ -87,14 +87,14 @@ class Staff_Custom_Fields {
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
-				'sanitize'    => 'sanitize_text_field',
+				'sanitize'    => 'bvsl_sanitize_staff_amount',
 			),
 			'salary_transportation_total'    => array(
 				'label'       => '交通費',
 				'type'        => 'text',
 				'description' => '',
 				'required'    => false,
-				'sanitize'    => 'sanitize_text_field',
+				'sanitize'    => 'bvsl_sanitize_staff_amount',
 			),
 			'salary_koyouhoken'              => array(
 				'label'       => '雇用保険',
@@ -164,4 +164,34 @@ function bvsl_sanitize_staff_birthday( $value ) {
 	}
 
 	return sprintf( '%04d-%02d-%02d', $year, $month, $day );
+}
+
+/**
+ * スタッフ金額項目を数値文字列に整える。
+ *
+ * @param string $value 入力値。
+ * @return string 正規化した数値文字列。無効な値は空文字を返す。
+ */
+function bvsl_sanitize_staff_amount( $value ) {
+	$value = sanitize_text_field( $value );
+	$value = str_replace( array( ',', ' ' ), '', $value );
+
+	if ( '' === $value ) {
+		return '';
+	}
+
+	if ( ! is_numeric( $value ) ) {
+		return '';
+	}
+
+	$amount = (float) $value;
+	if ( $amount < 0 ) {
+		return '';
+	}
+
+	if ( (float) (int) $amount === $amount ) {
+		return (string) (int) $amount;
+	}
+
+	return rtrim( rtrim( sprintf( '%.10F', $amount ), '0' ), '.' );
 }

@@ -135,9 +135,7 @@ function bill_staff_posts_custom_column( $column_name, $post_id ) {
 		return;
 	}
 
-	if ( 'salary_staff_status' !== $column_name && 'salary_fuyou' !== $column_name && 'salary_kenkou_hifuyousya' !== $column_name && 'salary_birthday' !== $column_name ) {
-		echo '-';
-	}
+	return;
 }
 
 add_action( 'quick_edit_custom_box', 'bill_staff_quick_edit_custom_box', 10, 2 );
@@ -174,11 +172,11 @@ function bill_staff_quick_edit_custom_box( $column_name, $post_type ) {
 			</label>
 			<label class="inline-edit-group">
 				<span class="title">基本給</span>
-				<input type="text" name="salary_base" value="" />
+				<input type="number" min="0" step="1" name="salary_base" value="" />
 			</label>
 			<label class="inline-edit-group">
 				<span class="title">交通費</span>
-				<input type="text" name="salary_transportation_total" value="" />
+				<input type="number" min="0" step="1" name="salary_transportation_total" value="" />
 			</label>
 			<label class="inline-edit-group">
 				<input type="checkbox" name="salary_koyouhoken[]" value="not_auto_cal" />
@@ -239,6 +237,36 @@ function bill_staff_quick_edit_script() {
 }
 
 add_action( 'save_post_staff', 'bill_staff_save_quick_edit_status', 10, 2 );
+/**
+ * 金額入力値を数値文字列に正規化する。
+ *
+ * @param string $value 入力値。
+ * @return string|null 空文字は空文字を返す。数値化できない値は null を返す。
+ */
+function bill_staff_normalize_amount_value( $value ) {
+	$value = sanitize_text_field( $value );
+	$value = str_replace( array( ',', ' ' ), '', $value );
+
+	if ( '' === $value ) {
+		return '';
+	}
+
+	if ( ! is_numeric( $value ) ) {
+		return null;
+	}
+
+	$amount = (float) $value;
+	if ( $amount < 0 ) {
+		return null;
+	}
+
+	if ( (float) (int) $amount === $amount ) {
+		return (string) (int) $amount;
+	}
+
+	return rtrim( rtrim( sprintf( '%.10F', $amount ), '0' ), '.' );
+}
+
 /**
  * クイック編集からスタッフステータスを保存する。
  *
@@ -316,7 +344,11 @@ function bill_staff_save_quick_edit_status( $post_id, $post ) {
 
 	$salary_base = '';
 	if ( isset( $_POST['salary_base'] ) ) {
-		$salary_base = sanitize_text_field( wp_unslash( $_POST['salary_base'] ) );
+		$salary_base = bill_staff_normalize_amount_value( wp_unslash( $_POST['salary_base'] ) );
+	}
+
+	if ( null === $salary_base ) {
+		return;
 	}
 
 	if ( '' === $salary_base ) {
@@ -327,7 +359,11 @@ function bill_staff_save_quick_edit_status( $post_id, $post ) {
 
 	$salary_transportation_total = '';
 	if ( isset( $_POST['salary_transportation_total'] ) ) {
-		$salary_transportation_total = sanitize_text_field( wp_unslash( $_POST['salary_transportation_total'] ) );
+		$salary_transportation_total = bill_staff_normalize_amount_value( wp_unslash( $_POST['salary_transportation_total'] ) );
+	}
+
+	if ( null === $salary_transportation_total ) {
+		return;
 	}
 
 	if ( '' === $salary_transportation_total ) {
