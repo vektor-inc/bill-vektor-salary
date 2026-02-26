@@ -37,6 +37,30 @@ $myUpdateChecker = Puc_v4_Factory::buildUpdateChecker(
 );
 $myUpdateChecker->setBranch( 'master' );
 
+/*
+	給与明細編集画面：管理画面用スクリプトの読み込み
+--------------------------------------------- */
+add_action( 'admin_enqueue_scripts', 'bvsl_admin_enqueue_scripts' );
+function bvsl_admin_enqueue_scripts( $hook ) {
+	// 投稿編集画面（post.php / post-new.php）のみ対象
+	if ( ! in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
+		return;
+	}
+	// salary 投稿タイプのみ対象
+	$post_id   = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
+	$post_type = $post_id ? get_post_type( $post_id ) : ( isset( $_GET['post_type'] ) ? sanitize_key( $_GET['post_type'] ) : '' );
+	if ( 'salary' !== $post_type ) {
+		return;
+	}
+	wp_enqueue_script(
+		'bvsl-admin-salary',
+		plugin_dir_url( __FILE__ ) . 'assets/js/admin-salary.js',
+		array(),
+		'1.0.0',
+		true
+	);
+}
+
 require_once 'inc/duplicate-doc.php';
 require_once 'inc/staff/staff.php';
 require_once 'inc/template-tags.php';
