@@ -49,6 +49,32 @@ class Staff_Custom_Fields {
 				'required'    => false,
 				'sanitize'    => 'sanitize_text_field',
 			),
+			'salary_staff_status'            => array(
+				'label'       => 'スタッフステータス',
+				'type'        => 'select',
+				'description' => '',
+				'required'    => false,
+				'options'     => array(
+					'employed'         => '勤務中',
+					'retired'          => '退職',
+					'leave_of_absence' => '休職',
+				),
+				'sanitize'    => 'sanitize_text_field',
+			),
+			'salary_fuyou'                   => array(
+				'label'       => '税扶養人数',
+				'type'        => 'text',
+				'description' => '',
+				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
+			),
+			'salary_kenkou_hifuyousya'       => array(
+				'label'       => '健康保険被扶養人数',
+				'type'        => 'text',
+				'description' => '',
+				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
+			),
 			'salary_transfer_account_bank'   => array(
 				'label'       => '振込銀行名',
 				'type'        => 'text',

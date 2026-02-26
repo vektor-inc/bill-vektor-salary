@@ -40,3 +40,241 @@ function bill_add_post_type_staff() {
 		)
 	);
 }
+
+add_filter( 'manage_staff_posts_columns', 'bill_staff_posts_columns' );
+/**
+ * スタッフ投稿一覧のカラムを調整する。
+ *
+ * 「タイトル」と「日付」の間にスタッフ関連の列を追加する。
+ *
+ * @param array $columns 投稿一覧に表示されるカラム配列。
+ * @return array 追加後のカラム配列。
+ */
+function bill_staff_posts_columns( $columns ) {
+	$new_columns = array();
+
+	foreach ( $columns as $key => $label ) {
+		$new_columns[ $key ] = $label;
+
+		if ( 'title' === $key ) {
+			$new_columns['salary_staff_status'] = 'スタッフステータス';
+			$new_columns['salary_fuyou']        = '税扶養人数';
+			$new_columns['salary_kenkou_hifuyousya'] = '健康保険被扶養人数';
+		}
+	}
+
+	return $new_columns;
+}
+
+add_action( 'manage_staff_posts_custom_column', 'bill_staff_posts_custom_column', 10, 2 );
+/**
+ * スタッフ投稿一覧のカスタムカラムに値を表示する。
+ *
+ * @param string $column_name 現在のカラム名。
+ * @param int    $post_id     現在の投稿ID。
+ * @return void
+ */
+function bill_staff_posts_custom_column( $column_name, $post_id ) {
+	if ( 'salary_staff_status' === $column_name ) {
+		$status = get_post_meta( $post_id, 'salary_staff_status', true );
+		$labels = array(
+			'employed'         => '勤務中',
+			'retired'          => '退職',
+			'leave_of_absence' => '休職',
+		);
+
+		if ( isset( $labels[ $status ] ) ) {
+			echo esc_html( $labels[ $status ] );
+		} else {
+			echo '-';
+		}
+
+		echo '<span class="bill-staff-status-value" style="display:none;">' . esc_html( $status ) . '</span>';
+		echo '<span class="bill-staff-kenkou-hifuyousya-value" style="display:none;">' . esc_html( get_post_meta( $post_id, 'salary_kenkou_hifuyousya', true ) ) . '</span>';
+		return;
+	}
+
+	if ( 'salary_fuyou' === $column_name ) {
+		$fuyou = get_post_meta( $post_id, 'salary_fuyou', true );
+		if ( '' === $fuyou ) {
+			echo '-';
+		} else {
+			echo esc_html( $fuyou );
+		}
+
+		echo '<span class="bill-staff-fuyou-value" style="display:none;">' . esc_html( $fuyou ) . '</span>';
+		return;
+	}
+
+	if ( 'salary_kenkou_hifuyousya' === $column_name ) {
+		$kenkou_hifuyousya = get_post_meta( $post_id, 'salary_kenkou_hifuyousya', true );
+		if ( '' === $kenkou_hifuyousya ) {
+			echo '-';
+		} else {
+			echo esc_html( $kenkou_hifuyousya );
+		}
+		return;
+	}
+
+	if ( 'salary_staff_status' !== $column_name && 'salary_fuyou' !== $column_name && 'salary_kenkou_hifuyousya' !== $column_name ) {
+		echo '-';
+	}
+}
+
+add_action( 'quick_edit_custom_box', 'bill_staff_quick_edit_custom_box', 10, 2 );
+/**
+ * スタッフ投稿一覧のクイック編集欄を追加する。
+ *
+ * @param string $column_name 現在のカラム名。
+ * @param string $post_type   投稿タイプ。
+ * @return void
+ */
+function bill_staff_quick_edit_custom_box( $column_name, $post_type ) {
+	if ( 'staff' !== $post_type || 'salary_staff_status' !== $column_name ) {
+		return;
+	}
+	?>
+	<fieldset class="inline-edit-col-right">
+		<div class="inline-edit-col">
+			<label class="inline-edit-group">
+				<span class="title">スタッフステータス</span>
+				<select name="salary_staff_status">
+					<option value="">選択してください</option>
+					<option value="employed">勤務中</option>
+					<option value="retired">退職</option>
+					<option value="leave_of_absence">休職</option>
+				</select>
+			</label>
+			<label class="inline-edit-group">
+				<span class="title">税扶養人数</span>
+				<input type="number" min="0" step="1" name="salary_fuyou" value="" />
+			</label>
+			<label class="inline-edit-group">
+				<span class="title">健康保険被扶養人数</span>
+				<input type="number" min="0" step="1" name="salary_kenkou_hifuyousya" value="" />
+			</label>
+		</div>
+	</fieldset>
+	<?php
+}
+
+add_action( 'admin_footer-edit.php', 'bill_staff_quick_edit_script' );
+/**
+ * クイック編集画面を開いたときに現在のスタッフステータスをセットする。
+ *
+ * @return void
+ */
+function bill_staff_quick_edit_script() {
+	global $typenow;
+
+	if ( 'staff' !== $typenow ) {
+		return;
+	}
+	?>
+	<script>
+	(function($){
+		var originalEdit = inlineEditPost.edit;
+		inlineEditPost.edit = function(id){
+			originalEdit.apply(this, arguments);
+
+			var postId = 0;
+			if (typeof id === 'object') {
+				postId = parseInt(this.getId(id), 10);
+			}
+
+			if (!postId) {
+				return;
+			}
+
+			var $postRow = $('#post-' + postId);
+			var $editRow = $('#edit-' + postId);
+			var status = $postRow.find('.column-salary_staff_status .bill-staff-status-value').text();
+			var fuyou = $postRow.find('.column-salary_fuyou .bill-staff-fuyou-value').text();
+			var kenkouHifuyousya = $postRow.find('.column-salary_staff_status .bill-staff-kenkou-hifuyousya-value').text();
+
+			$editRow.find('select[name=\"salary_staff_status\"]').val(status);
+			$editRow.find('input[name=\"salary_fuyou\"]').val(fuyou);
+			$editRow.find('input[name=\"salary_kenkou_hifuyousya\"]').val(kenkouHifuyousya);
+		};
+	})(jQuery);
+	</script>
+	<?php
+}
+
+add_action( 'save_post_staff', 'bill_staff_save_quick_edit_status', 10, 2 );
+/**
+ * クイック編集からスタッフステータスを保存する。
+ *
+ * @param int     $post_id 投稿ID。
+ * @param WP_Post $post    投稿オブジェクト。
+ * @return void
+ */
+function bill_staff_save_quick_edit_status( $post_id, $post ) {
+	if ( ! isset( $_POST['_inline_edit'] ) ) {
+		return;
+	}
+
+	$nonce = sanitize_text_field( wp_unslash( $_POST['_inline_edit'] ) );
+	if ( ! wp_verify_nonce( $nonce, 'inlineeditnonce' ) ) {
+		return;
+	}
+
+	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+		return;
+	}
+
+	if ( 'staff' !== $post->post_type ) {
+		return;
+	}
+
+	if ( ! current_user_can( 'edit_post', $post_id ) ) {
+		return;
+	}
+
+	$status = '';
+	if ( isset( $_POST['salary_staff_status'] ) ) {
+		$status = sanitize_text_field( wp_unslash( $_POST['salary_staff_status'] ) );
+	}
+
+	$allowed_status = array( 'employed', 'retired', 'leave_of_absence' );
+	if ( '' !== $status && ! in_array( $status, $allowed_status, true ) ) {
+		return;
+	}
+
+	if ( '' === $status ) {
+		delete_post_meta( $post_id, 'salary_staff_status' );
+	} else {
+		update_post_meta( $post_id, 'salary_staff_status', $status );
+	}
+
+	$fuyou = '';
+	if ( isset( $_POST['salary_fuyou'] ) ) {
+		$fuyou = sanitize_text_field( wp_unslash( $_POST['salary_fuyou'] ) );
+	}
+
+	if ( '' !== $fuyou && ! preg_match( '/^\d+$/', $fuyou ) ) {
+		return;
+	}
+
+	if ( '' === $fuyou ) {
+		delete_post_meta( $post_id, 'salary_fuyou' );
+	} else {
+		update_post_meta( $post_id, 'salary_fuyou', $fuyou );
+	}
+
+	$kenkou_hifuyousya = '';
+	if ( isset( $_POST['salary_kenkou_hifuyousya'] ) ) {
+		$kenkou_hifuyousya = sanitize_text_field( wp_unslash( $_POST['salary_kenkou_hifuyousya'] ) );
+	}
+
+	if ( '' !== $kenkou_hifuyousya && ! preg_match( '/^\d+$/', $kenkou_hifuyousya ) ) {
+		return;
+	}
+
+	if ( '' === $kenkou_hifuyousya ) {
+		delete_post_meta( $post_id, 'salary_kenkou_hifuyousya' );
+		return;
+	}
+
+	update_post_meta( $post_id, 'salary_kenkou_hifuyousya', $kenkou_hifuyousya );
+}

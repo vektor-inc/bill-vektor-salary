@@ -89,7 +89,7 @@ echo get_the_date();
 			<td><?php echo esc_html( $post->salary_role ); ?></td>
 		</tr>
 		<tr>
-			<th>扶養人数</th>
+			<th>税扶養人数</th>
 			<td class="text-right"><?php echo esc_html( $post->salary_fuyou ); ?></td>
 		</tr>
 	</tbody>
