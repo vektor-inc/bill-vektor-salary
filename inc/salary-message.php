@@ -142,17 +142,6 @@ function bvsl_save_salary_term_common_message( $term_id ) {
 function bvsl_get_salary_message_structure( $post_id ) {
 	$structure = (string) get_post_meta( $post_id, BVSL_SALARY_MESSAGE_STRUCTURE_META_KEY, true );
 
-	// 既存データとの後方互換のため、旧値 `1/2/3` を新キーへ変換する。
-	if ( '1' === $structure ) {
-		return BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON;
-	}
-	if ( '2' === $structure ) {
-		return BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE;
-	}
-	if ( '3' === $structure ) {
-		return BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON;
-	}
-
 	$allowed = array(
 		BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON,
 		BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE,

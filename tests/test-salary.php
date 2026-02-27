@@ -677,33 +677,6 @@ class SalaryTest extends WP_UnitTestCase {
 				),
 				'expected'            => '今月もお疲れでした',
 			),
-			array(
-				'test_condition_name' => '旧データ互換: 構成値1でも投稿メッセージ優先で返す',
-				'conditions'          => array(
-					'message_structure'    => '1',
-					'post_message'         => '投稿メッセージ本文',
-					'filled_term_message'  => '共通メッセージ本文',
-				),
-				'expected'            => '投稿メッセージ本文',
-			),
-			array(
-				'test_condition_name' => '旧データ互換: 構成値2でも共通 + 投稿の順で返す',
-				'conditions'          => array(
-					'message_structure'    => '2',
-					'post_message'         => '投稿メッセージ本文',
-					'filled_term_message'  => '共通メッセージ本文',
-				),
-				'expected'            => "共通メッセージ本文\n投稿メッセージ本文",
-			),
-			array(
-				'test_condition_name' => '旧データ互換: 構成値3でも投稿 + 共通の順で返す',
-				'conditions'          => array(
-					'message_structure'    => '3',
-					'post_message'         => '投稿メッセージ本文',
-					'filled_term_message'  => '共通メッセージ本文',
-				),
-				'expected'            => "投稿メッセージ本文\n共通メッセージ本文",
-			),
 		);
 
 		foreach ( $test_cases as $case ) {
