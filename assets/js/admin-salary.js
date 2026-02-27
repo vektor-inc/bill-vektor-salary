@@ -143,7 +143,7 @@
 			return;
 		}
 
-		var nenkinTr = nenkinInput.closest( 'tr.cf_item' );
+		var nenkinTr = nenkinInput.closest( 'tr.cf_item' ) || nenkinInput.closest( 'tr' );
 		if ( ! nenkinTr ) {
 			return;
 		}
@@ -278,6 +278,28 @@
 	}
 
 	/**
+	 * ローカライズ済みの共通メッセージから、先頭の非空メッセージを取得する。
+	 *
+	 * @param {Array} termIds チェック済みタームID配列
+	 * @return {string}
+	 */
+	function getLocalizedCommonMessage( termIds ) {
+		if ( ! window.bvslAdminSalary || ! window.bvslAdminSalary.termMessages ) {
+			return '';
+		}
+
+		var termMessages = window.bvslAdminSalary.termMessages;
+		for ( var i = 0; i < termIds.length; i++ ) {
+			var termId = String( termIds[ i ] );
+			if ( termMessages[ termId ] ) {
+				return String( termMessages[ termId ] );
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * 共通メッセージ表示行を、メッセージ入力欄の直前に追加する。
 	 *
 	 * @return {Element|null}
@@ -293,7 +315,7 @@
 			return null;
 		}
 
-		var messageTr = messageField.closest( 'tr.cf_item' );
+		var messageTr = messageField.closest( 'tr.cf_item' ) || messageField.closest( 'tr' );
 		if ( ! messageTr || ! messageTr.parentNode ) {
 			return null;
 		}
@@ -386,8 +408,17 @@
 			return;
 		}
 
+		var localizedCommonMessage = getLocalizedCommonMessage( termIds );
+		if ( localizedCommonMessage ) {
+			renderCommonMessage( localizedCommonMessage );
+		}
+
 		fetchCommonMessage( termIds ).then( function ( commonMessage ) {
-			renderCommonMessage( commonMessage );
+			if ( commonMessage ) {
+				renderCommonMessage( commonMessage );
+				return;
+			}
+			renderCommonMessage( localizedCommonMessage );
 		} );
 	}
 

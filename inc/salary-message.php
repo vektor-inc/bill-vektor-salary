@@ -22,6 +22,35 @@ add_action( 'edited_salary-term', 'bvsl_save_salary_term_common_message' );
 add_action( 'wp_ajax_bvsl_get_salary_term_common_message', 'bvsl_ajax_get_salary_term_common_message' );
 
 /**
+ * 支給分タームIDをキーにした共通メッセージ一覧を返す。
+ *
+ * @return array<string, string>
+ */
+function bvsl_get_salary_term_common_message_map() {
+	$terms = get_terms(
+		array(
+			'taxonomy'   => 'salary-term',
+			'hide_empty' => false,
+		)
+	);
+
+	if ( empty( $terms ) || is_wp_error( $terms ) ) {
+		return array();
+	}
+
+	$messages = array();
+	foreach ( $terms as $term ) {
+		$common_message = trim( (string) get_term_meta( $term->term_id, BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, true ) );
+		if ( '' === $common_message ) {
+			continue;
+		}
+		$messages[ (string) $term->term_id ] = $common_message;
+	}
+
+	return $messages;
+}
+
+/**
  * 支給分ターム新規作成フォームに共通メッセージ入力欄を表示する。
  *
  * @return void
@@ -215,4 +244,3 @@ function bvsl_build_salary_message( $post_id ) {
 
 	return $message;
 }
-
