@@ -215,103 +215,17 @@ function bvsl_render_salary_html_for_pdf( $post ) {
 	$original_post = $post;
 	setup_postdata( $post );
 
-	$css = bvsl_get_pdf_css();
-
 	ob_start();
-	require plugin_dir_path( __DIR__ ) . 'template-parts/doc/frame-salary.php';
-	$body = ob_get_clean();
+	require plugin_dir_path( __DIR__ ) . 'template-parts/doc/frame-salary-pdf.php';
+	$html = ob_get_clean();
 
 	wp_reset_postdata();
 	// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 	$GLOBALS['post'] = $original_post;
 
-	return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' . $css . '</style></head><body>' . $body . '</body></html>';
+	return $html;
 }
 
-/**
- * PDF用インラインCSSを返す。
- *
- * @return string CSS文字列。
- */
-function bvsl_get_pdf_css() {
-	return '
-body {
-	font-family: sans-serif;
-	font-size: 10pt;
-	color: #222;
-}
-.bill-wrap {
-	width: 100%;
-}
-.container {
-	width: 100%;
-}
-.row {
-	width: 100%;
-	display: table;
-	table-layout: fixed;
-}
-.col-xs-6 {
-	display: table-cell;
-	width: 50%;
-	vertical-align: top;
-	padding: 4px;
-	box-sizing: border-box;
-}
-h1.bill-title {
-	font-size: 16pt;
-	margin: 0 0 4px 0;
-}
-h2.bill-destination {
-	font-size: 12pt;
-	margin: 0 0 6px 0;
-}
-.bill-message {
-	font-size: 9pt;
-	margin-bottom: 8px;
-}
-table {
-	width: 100%;
-	border-collapse: collapse;
-	margin-bottom: 6px;
-	font-size: 9pt;
-}
-th, td {
-	border: 1px solid #aaa;
-	padding: 3px 5px;
-}
-thead th {
-	background: #f0f0f0;
-	text-align: center;
-}
-tfoot th, tfoot td {
-	background: #f5f5f5;
-	font-weight: bold;
-}
-.thead-dark th {
-	background: #555;
-	color: #fff;
-}
-td.price {
-	text-align: right;
-}
-.bill-info-table th, .bill-info-table td {
-	font-size: 9pt;
-}
-.bill-footer {
-	text-align: right;
-	margin-top: 8px;
-	font-size: 9pt;
-}
-.bill-footer h4 {
-	font-size: 11pt;
-}
-.bill-remarks {
-	margin: 6px 0;
-	font-size: 9pt;
-}
-';
-}
 
 /**
  * 給与明細PDF管理テーブルのHTMLを出力する。
