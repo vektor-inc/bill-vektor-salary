@@ -13,7 +13,6 @@
  */
 ( function () {
 	'use strict';
-	var commonMessageRequestGeneration = 0;
 
 	/**
 	 * カンマ・全角数字・前後空白を除去して数値に変換する
@@ -238,6 +237,7 @@
  */
 ( function () {
 	'use strict';
+	var commonMessageRequestGeneration = 0;
 
 	/**
 	 * 共通メッセージ表示の行IDを返す。
