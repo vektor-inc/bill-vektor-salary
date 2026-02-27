@@ -57,7 +57,6 @@ $custom_fields_hikazei = VK_Custom_Field_Builder_Flexible_Table::get_view_table_
 if ( $custom_fields_hikazei ) :
 ?>
 <table class="table table-bordered table-bill">
-<thead class="thead-dark">
 	<tr><th colspan="2">その他支給・控除（非課税）</th></tr>
 </thead>
 <tbody>

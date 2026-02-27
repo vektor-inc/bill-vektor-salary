@@ -39,7 +39,7 @@ global $post;
 $custom_fields_array = Salary_Table_Custom_Fields::custom_fields_kazei_array();
 $custom_fields_kazei = VK_Custom_Field_Builder_Flexible_Table::get_view_table_body( $custom_fields_array );
 if ( $custom_fields_kazei ) {
-	echo '<thead class="thead-dark">';
+	echo '<thead>';
 	echo '<tr><th colspan="2">その他支給・控除（課税対象）</th></tr>';
 	echo '</thead>';
 	echo '<tbody>';
