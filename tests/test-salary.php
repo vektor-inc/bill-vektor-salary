@@ -570,4 +570,98 @@ class SalaryTest extends WP_UnitTestCase {
 		}
 	}
 
+	/**
+	 * @since 0.10.0
+	 */
+	function test_bvsl_build_salary_message() {
+		print PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+		print 'bvsl_build_salary_message' . PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+
+		$salary_post_id = self::factory()->post->create(
+			array(
+				'post_title' => 'Salary for message test',
+				'post_type'  => 'salary',
+			)
+		);
+
+		$empty_term = wp_insert_term(
+			'2026年01月分 空',
+			'salary-term',
+			array(
+				'slug' => 'salary-term-empty-message',
+			)
+		);
+		$filled_term = wp_insert_term(
+			'2026年01月分 有',
+			'salary-term',
+			array(
+				'slug' => 'salary-term-filled-message',
+			)
+		);
+
+		$this->assertFalse( is_wp_error( $empty_term ) );
+		$this->assertFalse( is_wp_error( $filled_term ) );
+
+		update_term_meta( $empty_term['term_id'], BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, "　 \n\t" );
+		update_term_meta( $filled_term['term_id'], BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, '共通メッセージ本文' );
+
+		wp_set_object_terms(
+			$salary_post_id,
+			array( (int) $empty_term['term_id'], (int) $filled_term['term_id'] ),
+			'salary-term'
+		);
+
+		$test_data = array(
+			array(
+				'message_structure' => '1',
+				'post_message'      => '投稿メッセージ本文',
+				'expected'          => '投稿メッセージ本文',
+			),
+			array(
+				'message_structure' => '1',
+				'post_message'      => " \n\t　",
+				'expected'          => '共通メッセージ本文',
+			),
+			array(
+				'message_structure' => '2',
+				'post_message'      => '投稿メッセージ本文',
+				'expected'          => "共通メッセージ本文\n投稿メッセージ本文",
+			),
+			array(
+				'message_structure' => '2',
+				'post_message'      => "\n\t　",
+				'expected'          => '共通メッセージ本文',
+			),
+			array(
+				'message_structure' => '3',
+				'post_message'      => '投稿メッセージ本文',
+				'expected'          => "投稿メッセージ本文\n共通メッセージ本文",
+			),
+			array(
+				'message_structure' => '3',
+				'post_message'      => "\n\t　",
+				'expected'          => '共通メッセージ本文',
+			),
+		);
+
+		foreach ( $test_data as $test_value ) {
+			update_post_meta( $salary_post_id, 'salary_message_structure', $test_value['message_structure'] );
+			update_post_meta( $salary_post_id, 'salary_message', $test_value['post_message'] );
+
+			$actual = bvsl_build_salary_message( $salary_post_id );
+			print PHP_EOL;
+			print 'actual  :' . $actual . PHP_EOL;
+			print 'expected :' . $test_value['expected'] . PHP_EOL;
+			$this->assertSame( $test_value['expected'], $actual );
+		}
+
+		// 共通メッセージも投稿メッセージも空白のみの場合はデフォルト文言を返す。
+		update_term_meta( $filled_term['term_id'], BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, "\n\t　" );
+		update_post_meta( $salary_post_id, 'salary_message_structure', '1' );
+		update_post_meta( $salary_post_id, 'salary_message', " \n\t　" );
+		$this->assertSame( '今月もお疲れでした', bvsl_build_salary_message( $salary_post_id ) );
+	}
+
 }
