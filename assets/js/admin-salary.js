@@ -13,6 +13,7 @@
  */
 ( function () {
 	'use strict';
+	var commonMessageRequestGeneration = 0;
 
 	/**
 	 * カンマ・全角数字・前後空白を除去して数値に変換する
@@ -437,6 +438,7 @@
 	function updateCommonMessage() {
 		var termIds = getCheckedTermIds();
 		if ( ! termIds.length ) {
+			commonMessageRequestGeneration++;
 			renderCommonMessage( '' );
 			return;
 		}
@@ -446,7 +448,14 @@
 			renderCommonMessage( localizedCommonMessage );
 		}
 
+		commonMessageRequestGeneration++;
+		var requestGeneration = commonMessageRequestGeneration;
+
 		fetchCommonMessage( termIds ).then( function ( commonMessage ) {
+			if ( requestGeneration !== commonMessageRequestGeneration ) {
+				return;
+			}
+
 			if ( ! isBlankMessage( commonMessage ) ) {
 				renderCommonMessage( commonMessage );
 				return;
