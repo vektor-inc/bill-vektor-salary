@@ -106,16 +106,17 @@ function bvsl_generate_salary_pdf( $post_id ) {
 	// mPDF で PDF 生成。
 	try {
 		$config = array(
-			'mode'              => 'utf-8',
-			'format'            => 'A4',
-			'orientation'       => 'P',
-			'margin_top'        => 15,
-			'margin_right'      => 10,
-			'margin_bottom'     => 15,
-			'margin_left'       => 10,
-			'tempDir'           => sys_get_temp_dir(),
+			'mode'             => 'utf-8',
+			'format'           => 'A4',
+			'orientation'      => 'P',
+			'margin_top'       => 15,
+			'margin_right'     => 10,
+			'margin_bottom'    => 15,
+			'margin_left'      => 10,
+			'tempDir'          => sys_get_temp_dir(),
 			'autoScriptToLang' => true,
 			'autoLangToFont'   => true,
+			'default_font'     => 'kozgopromedium', // ゴシック体（サンセリフ）
 		);
 
 		$mpdf = new \Mpdf\Mpdf( $config );
