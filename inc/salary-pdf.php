@@ -115,8 +115,12 @@ function bvsl_generate_salary_pdf( $post_id ) {
 			'margin_left'      => 10,
 			'tempDir'          => sys_get_temp_dir(),
 			'autoScriptToLang' => true,
-			'autoLangToFont'   => false, // true にすると日本語が自動で明朝体に切り替わるため無効化。
-			'default_font'     => 'kozgopromedium', // ゴシック体（サンセリフ）
+			'autoLangToFont'   => true,  // 日本語グリフ描画に必須。
+			'default_font'     => 'kozgopromedium',
+			// autoLangToFont が日本語に自動選択する明朝体をゴシック体へリダイレクト。
+			'fonttrans'        => array(
+				'kozminproregular' => 'kozgopromedium',
+			),
 		);
 
 		$mpdf = new \Mpdf\Mpdf( $config );
