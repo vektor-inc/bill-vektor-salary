@@ -115,7 +115,7 @@ function bvsl_generate_salary_pdf( $post_id ) {
 			'margin_left'      => 10,
 			'tempDir'          => sys_get_temp_dir(),
 			'autoScriptToLang' => true,
-			'autoLangToFont'   => true,
+			'autoLangToFont'   => false, // true にすると日本語が自動で明朝体に切り替わるため無効化。
 			'default_font'     => 'kozgopromedium', // ゴシック体（サンセリフ）
 		);
 
