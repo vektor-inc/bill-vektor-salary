@@ -170,6 +170,7 @@
     'attachment_id' => 123,
     'filename'      => 'salary-456-20260227160000.pdf',
     'issued_at'     => '2026-02-27 16:00:00',  // 発行日時（Y-m-d H:i:s）
+    'pdf_url'       => 'http://localhost:8888/wp-content/uploads/salary-pdf/salary-456-20260227160000.pdf', // PDFのURL
   ],
   // 新しいものが先頭になるよう array_unshift() で追加する
 ]
