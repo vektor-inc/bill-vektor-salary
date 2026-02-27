@@ -193,13 +193,18 @@ function bvsl_ensure_salary_type_terms() {
 	foreach ( $fixed_terms as $slug => $name ) {
 		$term = get_term_by( 'slug', $slug, 'salary-type' );
 		if ( ! $term ) {
-			wp_insert_term(
+			$inserted_term = wp_insert_term(
 				$name,
 				'salary-type',
 				array(
 					'slug' => $slug,
 				)
 			);
+
+			if ( is_wp_error( $inserted_term ) ) {
+				// ターム作成失敗時に原因を追跡できるようにログへ出力する。
+				error_log( sprintf( 'bvsl_ensure_salary_type_terms failed. slug: %1$s, message: %2$s', $slug, $inserted_term->get_error_message() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 		}
 	}
 }
