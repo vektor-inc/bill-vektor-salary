@@ -61,6 +61,13 @@ class Staff_Custom_Fields {
 				),
 				'sanitize'    => 'sanitize_text_field',
 			),
+			'salary_staff_email'             => array(
+				'label'       => 'メールアドレス',
+				'type'        => 'text',
+				'description' => '',
+				'required'    => false,
+				'sanitize'    => 'sanitize_email',
+			),
 			'salary_fuyou'                   => array(
 				'label'       => '税扶養人数',
 				'type'        => 'text',
