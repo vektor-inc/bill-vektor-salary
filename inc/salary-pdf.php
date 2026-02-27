@@ -32,6 +32,8 @@ function bvsl_get_salary_pdf_sans_font_path() {
 	// TTC は設定が煩雑になるため除外し、TTF/OTF を優先する。
 	$candidates = array(
 		'/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf',
+		'/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf',
+		'/usr/share/fonts/opentype/ipafont-gothic/ipagp.ttf',
 		'/usr/share/fonts/truetype/ipafont-gothic/ipag.ttf',
 		'/usr/share/fonts/truetype/fonts-japanese-gothic.ttf',
 		'/usr/share/fonts/truetype/vlgothic/VL-Gothic-Regular.ttf',
