@@ -231,3 +231,188 @@
 		insertRows();
 	}
 }() );
+
+/**
+ * 給与明細編集画面 - 支給分の共通メッセージ表示
+ */
+( function () {
+	'use strict';
+
+	/**
+	 * 共通メッセージ表示の行IDを返す。
+	 *
+	 * @return {string}
+	 */
+	function getCommonMessageRowId() {
+		if ( window.bvslAdminSalary && window.bvslAdminSalary.commonMessageId ) {
+			return window.bvslAdminSalary.commonMessageId;
+		}
+		return 'bvsl-common-message-row';
+	}
+
+	/**
+	 * 支給分チェックのタームID配列を DOM 順で取得する。
+	 *
+	 * @return {Array}
+	 */
+	function getCheckedTermIds() {
+		var checkboxes = document.querySelectorAll( 'input[name="tax_input[salary-term][]"]' );
+		var termIds = [];
+
+		checkboxes.forEach( function ( checkbox ) {
+			if ( checkbox.checked ) {
+				termIds.push( checkbox.value );
+			}
+		} );
+
+		return termIds;
+	}
+
+	/**
+	 * 共通メッセージ表示行のDOM要素を取得する。
+	 *
+	 * @return {Element|null}
+	 */
+	function getCommonMessageRow() {
+		return document.getElementById( getCommonMessageRowId() );
+	}
+
+	/**
+	 * 共通メッセージ表示行を、メッセージ入力欄の直前に追加する。
+	 *
+	 * @return {Element|null}
+	 */
+	function ensureCommonMessageRow() {
+		var existing = getCommonMessageRow();
+		if ( existing ) {
+			return existing;
+		}
+
+		var messageField = document.getElementById( 'salary_message' );
+		if ( ! messageField ) {
+			return null;
+		}
+
+		var messageTr = messageField.closest( 'tr.cf_item' );
+		if ( ! messageTr || ! messageTr.parentNode ) {
+			return null;
+		}
+
+		var row = document.createElement( 'tr' );
+		row.id = getCommonMessageRowId();
+		row.className = 'cf_item';
+		row.style.display = 'none';
+		row.innerHTML =
+			'<th class="text-nowrap"><label>共通メッセージ（支給分）</label></th>' +
+			'<td><div id="bvsl-common-message-content" style="white-space: pre-wrap;"></div></td>';
+
+		messageTr.parentNode.insertBefore( row, messageTr );
+		return row;
+	}
+
+	/**
+	 * 共通メッセージを画面へ反映する。
+	 *
+	 * @param {string} commonMessage 表示メッセージ
+	 * @return {void}
+	 */
+	function renderCommonMessage( commonMessage ) {
+		var row = ensureCommonMessageRow();
+		if ( ! row ) {
+			return;
+		}
+
+		var content = row.querySelector( '#bvsl-common-message-content' );
+		if ( ! content ) {
+			return;
+		}
+
+		if ( commonMessage ) {
+			content.textContent = commonMessage;
+			row.style.display = '';
+			return;
+		}
+
+		content.textContent = '';
+		row.style.display = 'none';
+	}
+
+	/**
+	 * Ajaxで共通メッセージを取得する。
+	 *
+	 * @param {Array} termIds チェック済みタームID配列
+	 * @return {Promise<string>}
+	 */
+	function fetchCommonMessage( termIds ) {
+		if ( ! window.bvslAdminSalary || ! window.bvslAdminSalary.ajaxUrl || ! window.bvslAdminSalary.nonce ) {
+			return Promise.resolve( '' );
+		}
+
+		var formData = new window.FormData();
+		formData.append( 'action', 'bvsl_get_salary_term_common_message' );
+		formData.append( 'nonce', window.bvslAdminSalary.nonce );
+		termIds.forEach( function ( termId ) {
+			formData.append( 'term_ids[]', termId );
+		} );
+
+		return window.fetch( window.bvslAdminSalary.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: formData,
+		} )
+			.then( function ( response ) {
+				return response.json();
+			} )
+			.then( function ( json ) {
+				if ( ! json || ! json.success || ! json.data ) {
+					return '';
+				}
+				return json.data.common_message || '';
+			} )
+			.catch( function () {
+				return '';
+			} );
+	}
+
+	/**
+	 * 共通メッセージ表示を最新状態に更新する。
+	 *
+	 * @return {void}
+	 */
+	function updateCommonMessage() {
+		var termIds = getCheckedTermIds();
+		if ( ! termIds.length ) {
+			renderCommonMessage( '' );
+			return;
+		}
+
+		fetchCommonMessage( termIds ).then( function ( commonMessage ) {
+			renderCommonMessage( commonMessage );
+		} );
+	}
+
+	/**
+	 * イベントを設定する。
+	 *
+	 * @return {void}
+	 */
+	function initCommonMessage() {
+		var checkboxes = document.querySelectorAll( 'input[name="tax_input[salary-term][]"]' );
+		if ( ! checkboxes.length ) {
+			return;
+		}
+
+		ensureCommonMessageRow();
+		updateCommonMessage();
+
+		checkboxes.forEach( function ( checkbox ) {
+			checkbox.addEventListener( 'change', updateCommonMessage );
+		} );
+	}
+
+	if ( document.readyState === 'loading' ) {
+		document.addEventListener( 'DOMContentLoaded', initCommonMessage );
+	} else {
+		initCommonMessage();
+	}
+}() );

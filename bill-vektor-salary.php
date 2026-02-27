@@ -59,11 +59,22 @@ function bvsl_admin_enqueue_scripts( $hook ) {
 		'1.0.0',
 		true
 	);
+
+	wp_localize_script(
+		'bvsl-admin-salary',
+		'bvslAdminSalary',
+		array(
+			'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
+			'nonce'           => wp_create_nonce( 'bvsl_salary_admin_nonce' ),
+			'commonMessageId' => 'bvsl-common-message-row',
+		)
+	);
 }
 
 require_once 'inc/duplicate-doc.php';
 require_once 'inc/staff/staff.php';
 require_once 'inc/template-tags.php';
+require_once 'inc/salary-message.php';
 require_once 'inc/custom-field-setting/custom-field-salary-normal.php';
 require_once 'inc/custom-field-setting/custom-field-salary-table.php';
 require_once 'inc/custom-field-setting/custom-field-staff.php';
