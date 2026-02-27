@@ -19,6 +19,44 @@ add_action( 'wp_ajax_bvsl_generate_salary_pdf', 'bvsl_ajax_generate_salary_pdf' 
 add_action( 'wp_ajax_bvsl_delete_salary_pdf', 'bvsl_ajax_delete_salary_pdf' );
 
 /**
+ * PDFダウンロード(プレビュー) アクション。
+ */
+add_action( 'wp_ajax_bvsl_download_pdf', 'bvsl_ajax_download_pdf' );
+
+/**
+ * 認証・認可を経由してPDFファイルを出力する。
+ */
+function bvsl_ajax_download_pdf() {
+	if ( ! isset( $_GET['id'] ) || ! isset( $_GET['_wpnonce'] ) ) {
+		wp_die( '無効なリクエストです。' );
+	}
+
+	$attachment_id = (int) $_GET['id'];
+	if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'bvsl_download_pdf_' . $attachment_id ) ) {
+		wp_die( 'セキュリティチェックに失敗しました。' );
+	}
+
+	$post_id = wp_get_post_parent_id( $attachment_id );
+	if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
+		wp_die( 'アクセス権限がありません。' );
+	}
+
+	$file_path = get_attached_file( $attachment_id );
+	if ( ! $file_path || ! file_exists( $file_path ) ) {
+		wp_die( 'ファイルが見つかりません。' );
+	}
+
+	$filename = basename( $file_path );
+	header( 'Content-Type: application/pdf' );
+	// "inline" にするとブラウザでプレビューされる想定
+	header( 'Content-Disposition: inline; filename="' . $filename . '"' );
+	header( 'X-Robots-Tag: noindex, nofollow, noarchive' );
+
+	readfile( $file_path );
+	exit;
+}
+
+/**
  * 給与明細PDFで使う日本語ゴシックフォントの候補パスを返す。
  *
  * @return string フォントファイルの絶対パス。未検出時は空文字。
@@ -133,11 +171,17 @@ function bvsl_generate_salary_pdf( $post_id ) {
 		wp_mkdir_p( $pdf_dir );
 	}
 
+	// ディレクトリへの直接アクセスを禁止するための.htaccessを配置。
+	$htaccess_path = $pdf_dir . '/.htaccess';
+	if ( ! file_exists( $htaccess_path ) ) {
+		$htaccess_content = "Order deny,allow\nDeny from all\n";
+		file_put_contents( $htaccess_path, $htaccess_content );
+	}
+
 	$issued_at = current_time( 'Y-m-d H:i:s' );
 	$timestamp = current_time( 'YmdHis' );
 	$filename  = 'salary-' . $post_id . '-' . $timestamp . '.pdf';
 	$pdf_path  = $pdf_dir . '/' . $filename;
-	$pdf_url   = $upload_dir['baseurl'] . '/' . BVSL_PDF_SUBDIR . '/' . $filename;
 
 	// mPDF で PDF 生成。
 	try {
@@ -222,7 +266,6 @@ function bvsl_generate_salary_pdf( $post_id ) {
 	$record = array(
 		'attachment_id' => $attachment_id,
 		'filename'      => $filename,
-		'pdf_url'       => $pdf_url,
 		'issued_at'     => $issued_at,
 	);
 
@@ -234,7 +277,14 @@ function bvsl_generate_salary_pdf( $post_id ) {
 	update_post_meta( $post_id, BVSL_PDF_HISTORY_META_KEY, $history );
 
 	return array(
-		'pdf_url'       => $pdf_url,
+		'pdf_url'       => add_query_arg(
+			array(
+				'action'   => 'bvsl_download_pdf',
+				'id'       => $attachment_id,
+				'_wpnonce' => wp_create_nonce( 'bvsl_download_pdf_' . $attachment_id ),
+			),
+			admin_url( 'admin-ajax.php' )
+		),
 		'attachment_id' => $attachment_id,
 		'filename'      => $filename,
 		'issued_at'     => $issued_at,
@@ -329,7 +379,17 @@ function bvsl_render_pdf_history_table( $post_id ) {
 				<?php
 				$attachment_id = (int) ( $record['attachment_id'] ?? 0 );
 				$filename      = esc_html( $record['filename'] ?? '' );
-				$pdf_url       = esc_url( $record['pdf_url'] ?? '' );
+				$download_url  = '';
+				if ( $attachment_id ) {
+					$download_url = add_query_arg(
+						array(
+							'action'   => 'bvsl_download_pdf',
+							'id'       => $attachment_id,
+							'_wpnonce' => wp_create_nonce( 'bvsl_download_pdf_' . $attachment_id ),
+						),
+						admin_url( 'admin-ajax.php' )
+					);
+				}
 				$issued_at     = esc_html(
 					isset( $record['issued_at'] )
 						? date_i18n( 'Y/m/d H:i', strtotime( $record['issued_at'] ) )
@@ -344,9 +404,10 @@ function bvsl_render_pdf_history_table( $post_id ) {
 							class="button button-small bvsl-pdf-delete-btn"
 							data-attachment-id="<?php echo esc_attr( $attachment_id ); ?>"
 						><?php esc_html_e( '削除', 'bill-vektor-salary' ); ?></button>
-						<?php if ( $pdf_url ) : ?>
-						<a href="<?php echo $pdf_url; ?>"
+						<?php if ( $download_url ) : ?>
+						<a href="<?php echo esc_url( $download_url ); ?>"
 							target="_blank"
+							rel="noopener noreferrer"
 							class="button button-small"
 							style="margin-left:4px;"
 						><?php esc_html_e( 'プレビュー', 'bill-vektor-salary' ); ?></a>
