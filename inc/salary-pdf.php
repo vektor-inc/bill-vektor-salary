@@ -206,13 +206,19 @@ function bvsl_delete_salary_pdf_record( $post_id, $attachment_id ) {
 /**
  * PDF生成用のHTMLを組み立てて返す。
  *
- * @param WP_Post $post 投稿オブジェクト。
+ * @param WP_Post $post_to_render 投稿オブジェクト。
  * @return string HTML文字列。
  */
-function bvsl_render_salary_html_for_pdf( $post ) {
+function bvsl_render_salary_html_for_pdf( $post_to_render ) {
+	// グローバル $post を退避し、対象投稿に差し替えてからテンプレートをレンダリングする。
+	// 引数名を $post_to_render にしているのは、global $post; 宣言と衝突しないようにするため。
 	// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 	global $post;
 	$original_post = $post;
+
+	// グローバルに対象投稿をセット。
+	// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+	$post = $post_to_render;
 	setup_postdata( $post );
 
 	ob_start();
@@ -221,7 +227,7 @@ function bvsl_render_salary_html_for_pdf( $post ) {
 
 	wp_reset_postdata();
 	// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-	$GLOBALS['post'] = $original_post;
+	$post = $original_post;
 
 	return $html;
 }
