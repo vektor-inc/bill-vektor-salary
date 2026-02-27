@@ -278,6 +278,19 @@
 	}
 
 	/**
+	 * メッセージが空白のみかを判定する。
+	 *
+	 * @param {string} message 判定対象
+	 * @return {boolean}
+	 */
+	function isBlankMessage( message ) {
+		if ( null === message || typeof message === 'undefined' ) {
+			return true;
+		}
+		return String( message ).replace( /[\s\u3000]+/g, '' ) === '';
+	}
+
+	/**
 	 * メッセージ入力欄の行要素を取得する。
 	 *
 	 * @return {Element|null}
@@ -316,7 +329,7 @@
 		var termMessages = window.bvslAdminSalary.termMessages;
 		for ( var i = 0; i < termIds.length; i++ ) {
 			var termId = String( termIds[ i ] );
-			if ( termMessages[ termId ] ) {
+			if ( termMessages[ termId ] && ! isBlankMessage( termMessages[ termId ] ) ) {
 				return String( termMessages[ termId ] );
 			}
 		}
@@ -369,7 +382,7 @@
 			return;
 		}
 
-		if ( commonMessage ) {
+		if ( ! isBlankMessage( commonMessage ) ) {
 			content.textContent = commonMessage;
 			row.style.display = '';
 			return;
@@ -429,12 +442,12 @@
 		}
 
 		var localizedCommonMessage = getLocalizedCommonMessage( termIds );
-		if ( localizedCommonMessage ) {
+		if ( ! isBlankMessage( localizedCommonMessage ) ) {
 			renderCommonMessage( localizedCommonMessage );
 		}
 
 		fetchCommonMessage( termIds ).then( function ( commonMessage ) {
-			if ( commonMessage ) {
+			if ( ! isBlankMessage( commonMessage ) ) {
 				renderCommonMessage( commonMessage );
 				return;
 			}

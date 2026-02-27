@@ -22,6 +22,23 @@ add_action( 'edited_salary-term', 'bvsl_save_salary_term_common_message' );
 add_action( 'wp_ajax_bvsl_get_salary_term_common_message', 'bvsl_ajax_get_salary_term_common_message' );
 
 /**
+ * メッセージが空白のみかを判定する。
+ *
+ * 半角/全角スペースや改行・タブのみの場合は空扱いにする。
+ *
+ * @param string $message 判定対象メッセージ。
+ * @return bool
+ */
+function bvsl_is_blank_message( $message ) {
+	$normalized = preg_replace( '/[\p{Z}\s]+/u', '', (string) $message );
+	if ( null === $normalized ) {
+		$normalized = trim( (string) $message );
+	}
+
+	return '' === $normalized;
+}
+
+/**
  * 支給分タームIDをキーにした共通メッセージ一覧を返す。
  *
  * @return array<string, string>
@@ -40,8 +57,8 @@ function bvsl_get_salary_term_common_message_map() {
 
 	$messages = array();
 	foreach ( $terms as $term ) {
-		$common_message = trim( (string) get_term_meta( $term->term_id, BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, true ) );
-		if ( '' === $common_message ) {
+		$common_message = (string) get_term_meta( $term->term_id, BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, true );
+		if ( bvsl_is_blank_message( $common_message ) ) {
 			continue;
 		}
 		$messages[ (string) $term->term_id ] = $common_message;
@@ -144,9 +161,7 @@ function bvsl_get_salary_term_common_message_by_post( $post_id ) {
 
 	foreach ( $terms as $term ) {
 		$common_message = (string) get_term_meta( $term->term_id, BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, true );
-		$common_message = trim( $common_message );
-
-		if ( '' !== $common_message ) {
+		if ( ! bvsl_is_blank_message( $common_message ) ) {
 			return $common_message;
 		}
 	}
@@ -167,9 +182,7 @@ function bvsl_get_salary_term_common_message_by_term_ids( $term_ids ) {
 
 	foreach ( $term_ids as $term_id ) {
 		$common_message = (string) get_term_meta( (int) $term_id, BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, true );
-		$common_message = trim( $common_message );
-
-		if ( '' !== $common_message ) {
+		if ( ! bvsl_is_blank_message( $common_message ) ) {
 			return $common_message;
 		}
 	}
@@ -211,7 +224,7 @@ function bvsl_ajax_get_salary_term_common_message() {
  * @return string
  */
 function bvsl_build_salary_message( $post_id ) {
-	$post_message   = trim( (string) get_post_meta( $post_id, 'salary_message', true ) );
+	$post_message   = (string) get_post_meta( $post_id, 'salary_message', true );
 	$common_message = bvsl_get_salary_term_common_message_by_post( $post_id );
 	$structure      = bvsl_get_salary_message_structure( $post_id );
 	$message        = '';
@@ -222,7 +235,9 @@ function bvsl_build_salary_message( $post_id ) {
 				$common_message,
 				$post_message,
 			),
-			'strlen'
+			function ( $value ) {
+				return ! bvsl_is_blank_message( $value );
+			}
 		);
 		$message = implode( "\n", $parts );
 	} elseif ( '3' === $structure ) {
@@ -231,14 +246,16 @@ function bvsl_build_salary_message( $post_id ) {
 				$post_message,
 				$common_message,
 			),
-			'strlen'
+			function ( $value ) {
+				return ! bvsl_is_blank_message( $value );
+			}
 		);
 		$message = implode( "\n", $parts );
 	} else {
-		$message = '' !== $post_message ? $post_message : $common_message;
+		$message = ! bvsl_is_blank_message( $post_message ) ? $post_message : $common_message;
 	}
 
-	if ( '' === trim( $message ) ) {
+	if ( bvsl_is_blank_message( $message ) ) {
 		$message = '今月もお疲れでした';
 	}
 
