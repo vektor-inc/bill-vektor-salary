@@ -8,6 +8,7 @@
  * Text Domain:     bill-vektor-salary
  * Domain Path:     /languages
  * Version:         0.10.0
+ * Requires PHP:    8.0
  *
  * @package         Bill_Vektor_Salary
  */

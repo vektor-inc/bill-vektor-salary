@@ -2,7 +2,8 @@
 Contributors: kurudrive
 Donate link:
 Tags: comments, spam
-Requires at least: 4.5
+Requires at least: 6.0
+Requires PHP: 8.0
 Tested up to: 6.8
 Stable tag: 0.10.0
 License: GPLv2 or later
