@@ -19,6 +19,40 @@ add_action( 'wp_ajax_bvsl_generate_salary_pdf', 'bvsl_ajax_generate_salary_pdf' 
 add_action( 'wp_ajax_bvsl_delete_salary_pdf', 'bvsl_ajax_delete_salary_pdf' );
 
 /**
+ * 給与明細PDFで使う日本語ゴシックフォントの候補パスを返す。
+ *
+ * @return string フォントファイルの絶対パス。未検出時は空文字。
+ */
+function bvsl_get_salary_pdf_sans_font_path() {
+	$font_path = apply_filters( 'bvsl_salary_pdf_font_path', '' );
+	if ( is_string( $font_path ) && '' !== $font_path && file_exists( $font_path ) && is_readable( $font_path ) ) {
+		return $font_path;
+	}
+
+	// TTC は設定が煩雑になるため除外し、TTF/OTF を優先する。
+	$candidates = array(
+		'/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf',
+		'/usr/share/fonts/truetype/ipafont-gothic/ipag.ttf',
+		'/usr/share/fonts/truetype/fonts-japanese-gothic.ttf',
+		'/usr/share/fonts/truetype/vlgothic/VL-Gothic-Regular.ttf',
+		'/usr/share/fonts/truetype/noto/NotoSansJP-Regular.otf',
+		'/usr/share/fonts/opentype/noto/NotoSansJP-Regular.otf',
+		'/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.otf',
+		'/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',
+		'/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+		'/Library/Fonts/Arial Unicode.ttf',
+	);
+
+	foreach ( $candidates as $candidate ) {
+		if ( file_exists( $candidate ) && is_readable( $candidate ) ) {
+			return $candidate;
+		}
+	}
+
+	return '';
+}
+
+/**
  * PDF発行 Ajax ハンドラ。
  *
  * @return void
@@ -115,16 +149,41 @@ function bvsl_generate_salary_pdf( $post_id ) {
 			'margin_left'      => 10,
 			'tempDir'          => sys_get_temp_dir(),
 			'autoScriptToLang' => true,
-			'autoLangToFont'   => true,  // 日本語グリフ描画に必須。
-			// 日本語はゴシック体（サンセリフ）優先で描画する。
+			'autoLangToFont'   => true,
+			// フォールバック（ゴシック未検出時）は従来設定。
 			'default_font'     => 'sjis',
-			// autoLangToFont が日本語に自動選択する明朝体系フォントをゴシック体へ強制リダイレクト。
 			'fonttrans'        => array(
 				'kozminproregular' => 'sjis',
 				'sun-exta'         => 'sjis',
 				'kozgopromedium'   => 'sjis',
 			),
 		);
+
+		// 利用可能な日本語ゴシックフォント（TTF/OTF）があれば、それを優先して使う。
+		$sans_font_path = bvsl_get_salary_pdf_sans_font_path();
+		if ( '' !== $sans_font_path ) {
+			$font_dir  = dirname( $sans_font_path );
+			$font_file = basename( $sans_font_path );
+
+			$default_font_config = new \Mpdf\Config\FontVariables();
+			$font_data           = $default_font_config->getDefaults()['fontdata'];
+			$font_dirs           = $default_font_config->getDefaults()['fontDir'];
+
+			$config['fontDir']  = array_merge( $font_dirs, array( $font_dir ) );
+			$config['fontdata'] = $font_data + array(
+				'bvsljapansans' => array(
+					'R' => $font_file,
+				),
+			);
+			$config['default_font']   = 'bvsljapansans';
+			$config['autoLangToFont'] = false;
+			$config['fonttrans']      = array(
+				'kozminproregular' => 'bvsljapansans',
+				'sun-exta'         => 'bvsljapansans',
+				'kozgopromedium'   => 'bvsljapansans',
+				'sjis'             => 'bvsljapansans',
+			);
+		}
 
 		$mpdf = new \Mpdf\Mpdf( $config );
 		$mpdf->WriteHTML( $html );

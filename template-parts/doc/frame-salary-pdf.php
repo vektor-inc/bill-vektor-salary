@@ -20,7 +20,7 @@ global $post;
 	box-sizing: border-box;
 }
 body {
-	font-family: sjis, sans-serif;
+	font-family: bvsljapansans, sjis, sans-serif;
 	font-size: 9.5pt;
 	color: #222;
 	margin: 0;
