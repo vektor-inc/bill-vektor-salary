@@ -256,7 +256,7 @@
 	 * @return {Array}
 	 */
 	function getCheckedTermIds() {
-		var checkboxes = document.querySelectorAll( 'input[name="tax_input[salary-term][]"]' );
+		var checkboxes = document.querySelectorAll( '#taxonomy-salary-term input[type="checkbox"][name^="tax_input[salary-term]"]' );
 		var termIds = [];
 
 		checkboxes.forEach( function ( checkbox ) {
@@ -275,6 +275,31 @@
 	 */
 	function getCommonMessageRow() {
 		return document.getElementById( getCommonMessageRowId() );
+	}
+
+	/**
+	 * メッセージ入力欄の行要素を取得する。
+	 *
+	 * @return {Element|null}
+	 */
+	function findMessageRow() {
+		var messageField = document.getElementById( 'salary_message' ) ||
+			document.querySelector( 'textarea[name="salary_message"]' ) ||
+			document.querySelector( 'textarea[id*="salary_message"]' );
+
+		if ( messageField ) {
+			return messageField.closest( 'tr.cf_item' ) || messageField.closest( 'tr' );
+		}
+
+		// フィールドID差異があるケースに備えて、ラベル文字列でも補助探索する。
+		var labels = document.querySelectorAll( '.postbox th, .postbox label' );
+		for ( var i = 0; i < labels.length; i++ ) {
+			if ( labels[ i ].textContent && labels[ i ].textContent.replace( /\s+/g, '' ) === 'メッセージ' ) {
+				return labels[ i ].closest( 'tr' );
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -310,12 +335,7 @@
 			return existing;
 		}
 
-		var messageField = document.getElementById( 'salary_message' );
-		if ( ! messageField ) {
-			return null;
-		}
-
-		var messageTr = messageField.closest( 'tr.cf_item' ) || messageField.closest( 'tr' );
+		var messageTr = findMessageRow();
 		if ( ! messageTr || ! messageTr.parentNode ) {
 			return null;
 		}
@@ -428,17 +448,22 @@
 	 * @return {void}
 	 */
 	function initCommonMessage() {
-		var checkboxes = document.querySelectorAll( 'input[name="tax_input[salary-term][]"]' );
-		if ( ! checkboxes.length ) {
-			return;
-		}
-
 		ensureCommonMessageRow();
 		updateCommonMessage();
 
-		checkboxes.forEach( function ( checkbox ) {
-			checkbox.addEventListener( 'change', updateCommonMessage );
+		// 動的UI更新にも追従できるようイベント委譲で監視する。
+		document.addEventListener( 'change', function ( event ) {
+			var target = event.target;
+			if ( target && target.matches( '#taxonomy-salary-term input[type="checkbox"][name^="tax_input[salary-term]"]' ) ) {
+				updateCommonMessage();
+			}
 		} );
+
+		// 画面描画タイミング差分に備えて初回だけ再試行する。
+		window.setTimeout( function () {
+			ensureCommonMessageRow();
+			updateCommonMessage();
+		}, 300 );
 	}
 
 	if ( document.readyState === 'loading' ) {
