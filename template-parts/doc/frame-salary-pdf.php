@@ -183,13 +183,13 @@ h2.bill-destination {
 		}
 		?>
 		</h1>
-			<div style="height: 1em; line-height: 1em; font-size: 1em;">&nbsp;</div>
+			<div style="height: 0.5em; line-height: 0.5em; font-size: 0.5em;">&nbsp;</div>
 
 		<?php if ( $post->salary_staff ) : ?>
 		<h2 class="bill-destination">
 			<?php echo esc_html( get_the_title( $post->salary_staff ) ); ?> 様
 		</h2>
-			<div style="height: 1em; line-height: 1em; font-size: 1em;">&nbsp;</div>
+			<div style="height: 0.5em; line-height: 0.5em; font-size: 0.5em;">&nbsp;</div>
 		<?php endif; ?>
 
 		<div class="bill-message">
