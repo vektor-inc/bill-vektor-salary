@@ -617,7 +617,7 @@ class SalaryTest extends WP_UnitTestCase {
 			array(
 				'test_condition_name' => '構成1: 投稿メッセージが非空の場合は投稿メッセージを返す',
 				'conditions'          => array(
-					'message_structure'    => '1',
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON,
 					'post_message'         => '投稿メッセージ本文',
 					'filled_term_message'  => '共通メッセージ本文',
 				),
@@ -626,7 +626,7 @@ class SalaryTest extends WP_UnitTestCase {
 			array(
 				'test_condition_name' => '構成1: 投稿メッセージが空白のみの場合は共通メッセージを返す',
 				'conditions'          => array(
-					'message_structure'    => '1',
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON,
 					'post_message'         => " \n\t　",
 					'filled_term_message'  => '共通メッセージ本文',
 				),
@@ -635,7 +635,7 @@ class SalaryTest extends WP_UnitTestCase {
 			array(
 				'test_condition_name' => '構成2: 共通メッセージ + 投稿メッセージの順で返す',
 				'conditions'          => array(
-					'message_structure'    => '2',
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE,
 					'post_message'         => '投稿メッセージ本文',
 					'filled_term_message'  => '共通メッセージ本文',
 				),
@@ -644,7 +644,7 @@ class SalaryTest extends WP_UnitTestCase {
 			array(
 				'test_condition_name' => '構成2: 投稿メッセージが空白のみの場合は共通メッセージのみ返す',
 				'conditions'          => array(
-					'message_structure'    => '2',
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE,
 					'post_message'         => "\n\t　",
 					'filled_term_message'  => '共通メッセージ本文',
 				),
@@ -653,7 +653,7 @@ class SalaryTest extends WP_UnitTestCase {
 			array(
 				'test_condition_name' => '構成3: 投稿メッセージ + 共通メッセージの順で返す',
 				'conditions'          => array(
-					'message_structure'    => '3',
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON,
 					'post_message'         => '投稿メッセージ本文',
 					'filled_term_message'  => '共通メッセージ本文',
 				),
@@ -662,7 +662,7 @@ class SalaryTest extends WP_UnitTestCase {
 			array(
 				'test_condition_name' => '構成3: 投稿メッセージが空白のみの場合は共通メッセージのみ返す',
 				'conditions'          => array(
-					'message_structure'    => '3',
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON,
 					'post_message'         => "\n\t　",
 					'filled_term_message'  => '共通メッセージ本文',
 				),
@@ -671,11 +671,38 @@ class SalaryTest extends WP_UnitTestCase {
 			array(
 				'test_condition_name' => '構成1: 共通メッセージも投稿メッセージも空白のみの場合はデフォルト文言を返す',
 				'conditions'          => array(
-					'message_structure'    => '1',
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON,
 					'post_message'         => " \n\t　",
 					'filled_term_message'  => "\n\t　",
 				),
 				'expected'            => '今月もお疲れでした',
+			),
+			array(
+				'test_condition_name' => '旧データ互換: 構成値1でも投稿メッセージ優先で返す',
+				'conditions'          => array(
+					'message_structure'    => '1',
+					'post_message'         => '投稿メッセージ本文',
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => '投稿メッセージ本文',
+			),
+			array(
+				'test_condition_name' => '旧データ互換: 構成値2でも共通 + 投稿の順で返す',
+				'conditions'          => array(
+					'message_structure'    => '2',
+					'post_message'         => '投稿メッセージ本文',
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => "共通メッセージ本文\n投稿メッセージ本文",
+			),
+			array(
+				'test_condition_name' => '旧データ互換: 構成値3でも投稿 + 共通の順で返す',
+				'conditions'          => array(
+					'message_structure'    => '3',
+					'post_message'         => '投稿メッセージ本文',
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => "投稿メッセージ本文\n共通メッセージ本文",
 			),
 		);
 

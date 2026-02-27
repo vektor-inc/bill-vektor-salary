@@ -42,10 +42,10 @@ class Salary_Normal_Custom_Fields {
 		// $custom_fields_all_array = array_merge(  $custom_fields_array, $custom_fields_array_no_cf_builder );
 		VK_Custom_Field_Builder::save_cf_value( $custom_fields_array );
 
-		// 新規作成時など未選択の場合でも、メッセージ構成は `1` を既定値として保存する。
+		// 新規作成時など未選択の場合でも、メッセージ構成は既定値を保存する。
 		$message_structure = (string) get_post_meta( $post_id, 'salary_message_structure', true );
 		if ( '' === $message_structure ) {
-			update_post_meta( $post_id, 'salary_message_structure', '1' );
+			update_post_meta( $post_id, 'salary_message_structure', BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON );
 		}
 	}
 
@@ -105,9 +105,9 @@ class Salary_Normal_Custom_Fields {
 				'type'        => 'radio',
 				'description' => '',
 				'options'     => array(
-					'1' => 'メッセージの内容を反映。メッセージ が空の場合はタクソノミー「支給分」の「共通メッセージ」の内容を反映。',
-					'2' => '共通メッセージ + メッセージ',
-					'3' => 'メッセージ + 共通メッセージ',
+					BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON => 'メッセージの内容を反映。メッセージ が空の場合はタクソノミー「支給分」の「共通メッセージ」の内容を反映。',
+					BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE => '共通メッセージ + メッセージ',
+					BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON => 'メッセージ + 共通メッセージ',
 				),
 				'required'    => false,
 			),

@@ -38,8 +38,8 @@
   - 保存時: `wp_kses_post()` 相当でサニタイズ
 - 投稿メタキー: `salary_message_structure`
   - 対象: post type `salary`
-  - 値: `1` / `2` / `3`
-  - デフォルト: `1`
+  - 値: `message_or_common` / `common_then_message` / `message_then_common`
+  - デフォルト: `message_or_common`
 
 ## 管理画面仕様（フェーズ1）
 1. `salary-term` の追加/編集画面に「共通メッセージ」入力欄を追加

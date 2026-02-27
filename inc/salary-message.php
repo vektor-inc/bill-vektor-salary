@@ -14,6 +14,9 @@ define( 'BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY', 'bvsl_salary_term_common_mes
  * 給与明細投稿のメッセージ構成保存キー。
  */
 define( 'BVSL_SALARY_MESSAGE_STRUCTURE_META_KEY', 'salary_message_structure' );
+define( 'BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON', 'message_or_common' );
+define( 'BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE', 'common_then_message' );
+define( 'BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON', 'message_then_common' );
 
 add_action( 'salary-term_add_form_fields', 'bvsl_salary_term_add_common_message_field' );
 add_action( 'salary-term_edit_form_fields', 'bvsl_salary_term_edit_common_message_field' );
@@ -134,13 +137,29 @@ function bvsl_save_salary_term_common_message( $term_id ) {
  * 給与明細のメッセージ構成値を取得する。
  *
  * @param int $post_id 投稿ID。
- * @return string `1` / `2` / `3`
+ * @return string
  */
 function bvsl_get_salary_message_structure( $post_id ) {
 	$structure = (string) get_post_meta( $post_id, BVSL_SALARY_MESSAGE_STRUCTURE_META_KEY, true );
 
-	if ( ! in_array( $structure, array( '1', '2', '3' ), true ) ) {
-		return '1';
+	// 既存データとの後方互換のため、旧値 `1/2/3` を新キーへ変換する。
+	if ( '1' === $structure ) {
+		return BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON;
+	}
+	if ( '2' === $structure ) {
+		return BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE;
+	}
+	if ( '3' === $structure ) {
+		return BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON;
+	}
+
+	$allowed = array(
+		BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON,
+		BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE,
+		BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON,
+	);
+	if ( ! in_array( $structure, $allowed, true ) ) {
+		return BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON;
 	}
 
 	return $structure;
@@ -229,7 +248,7 @@ function bvsl_build_salary_message( $post_id ) {
 	$structure      = bvsl_get_salary_message_structure( $post_id );
 	$message        = '';
 
-	if ( '2' === $structure ) {
+	if ( BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE === $structure ) {
 		$parts = array_filter(
 			array(
 				$common_message,
@@ -240,7 +259,7 @@ function bvsl_build_salary_message( $post_id ) {
 			}
 		);
 		$message = implode( "\n", $parts );
-	} elseif ( '3' === $structure ) {
+	} elseif ( BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON === $structure ) {
 		$parts = array_filter(
 			array(
 				$post_message,
