@@ -123,34 +123,30 @@ add_action(
 );
 
 /*
-	PDF発行メタボックス（サイドバー）
+	PDF発行ボタン（公開メタボックス内）
 --------------------------------------------- */
-add_action( 'admin_menu', 'bvsl_add_pdf_issue_metabox' );
-function bvsl_add_pdf_issue_metabox() {
-	add_meta_box(
-		'bvsl_pdf_issue',
-		'PDF発行',
-		'bvsl_render_pdf_issue_metabox',
-		'salary',
-		'side',
-		'high'
-	);
-}
-function bvsl_render_pdf_issue_metabox( $post ) {
+add_action( 'post_submitbox_start', 'bvsl_render_pdf_issue_in_submitbox', 20 );
+function bvsl_render_pdf_issue_in_submitbox( $post ) {
+	if ( 'salary' !== get_post_type( $post ) ) {
+		return;
+	}
 	$is_new = ( 'auto-draft' === $post->post_status || 0 === $post->ID );
 	?>
-	<div id="bvsl-pdf-issue-wrap">
+	<div id="bvsl-pdf-issue-wrap" style="padding: 10px; border-top: 1px solid #dcdcde;">
 		<button
 			type="button"
 			id="bvsl-pdf-issue-btn"
-			class="button button-primary"
+			class="button button-primary button-large"
 			<?php echo $is_new ? 'disabled' : ''; ?>
+			style="width: 100%; display: block; text-align: center;"
 		>PDF発行</button>
 		<?php if ( $is_new ) : ?>
 		<p style="margin-top:6px;color:#555;font-size:12px;">先に保存してから発行できます。</p>
 		<?php endif; ?>
-		<span id="bvsl-pdf-issue-spinner" class="spinner" style="float:none;display:none;"></span>
-		<p id="bvsl-pdf-issue-message" style="margin-top:6px;"></p>
+		<div style="display:flex; align-items:center; margin-top:6px;">
+			<span id="bvsl-pdf-issue-spinner" class="spinner" style="float:none; display:none; margin:0 8px 0 0;"></span>
+			<p id="bvsl-pdf-issue-message" style="margin:0; text-align:left;"></p>
+		</div>
 	</div>
 	<?php
 }
