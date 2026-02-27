@@ -46,15 +46,21 @@ body {
 }
 
 h1.bill-title {
+	display: block;
+	width: 100%;
 	font-size: 16pt;
 	font-weight: bold;
-	margin: 0 0 4px 0;
-	padding: 0;
+	margin: 0 0 6pt 0;
+	padding: 0 0 3pt 0;
+	border-bottom: 1pt double #000;
 }
 h2.bill-destination {
+	display: block;
+	width: 100%;
 	font-size: 12pt;
-	margin: 0 0 6px 0;
-	padding: 0;
+	margin: 0 0 6pt 0;
+	padding: 0 0 3pt 0;
+	border-bottom: 1pt solid #000;
 }
 .bill-message {
 	font-size: 9pt;

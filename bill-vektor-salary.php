@@ -93,6 +93,36 @@ require_once 'inc/custom-field-setting/custom-field-salary-table.php';
 require_once 'inc/custom-field-setting/custom-field-staff.php';
 
 /*
+	PDFテンプレート ブラウザプレビュー
+	?bvsl_pdf_preview=1&post_id={post_id} で管理者がブラウザで HTML を確認できる。
+	DevTools で CSS を調整してから frame-salary-pdf.php に反映する用途。
+--------------------------------------------- */
+add_action(
+	'template_redirect',
+	function () {
+		if ( ! isset( $_GET['bvsl_pdf_preview'] ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( 'Permission denied.' );
+		}
+		$post_id = isset( $_GET['post_id'] ) ? (int) $_GET['post_id'] : 0;
+		if ( ! $post_id ) {
+			wp_die( 'post_id が指定されていません。' );
+		}
+		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		global $post;
+		$post = get_post( $post_id );
+		if ( ! $post || 'salary' !== $post->post_type ) {
+			wp_die( '指定された投稿が見つかりません。' );
+		}
+		setup_postdata( $post );
+		require plugin_dir_path( __FILE__ ) . 'template-parts/doc/frame-salary-pdf.php';
+		exit;
+	}
+);
+
+/*
 	PDF発行メタボックス（サイドバー）
 --------------------------------------------- */
 add_action( 'admin_menu', 'bvsl_add_pdf_issue_metabox' );
