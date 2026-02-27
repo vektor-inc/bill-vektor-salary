@@ -20,7 +20,8 @@
         }
     ],
     "require": {
-        "yahnis-elsts/plugin-update-checker": "^5.0"
+        "yahnis-elsts/plugin-update-checker": "^5.0",
+        "mpdf/mpdf": "^8.0"
     },
     "scripts": {
         "format": "phpcbf --standard=./.phpcs.xml --report-summary --report-source",

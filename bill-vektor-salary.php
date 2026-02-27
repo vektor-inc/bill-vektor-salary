@@ -75,8 +75,10 @@ function bvsl_admin_enqueue_scripts( $hook ) {
 		array(
 			'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
 			'nonce'           => wp_create_nonce( 'bvsl_salary_admin_nonce' ),
+			'pdfNonce'        => wp_create_nonce( 'bvsl_generate_salary_pdf_nonce' ),
 			'commonMessageId' => 'bvsl-common-message-row',
 			'termMessages'    => $term_messages,
+			'postId'          => $post_id,
 		)
 	);
 }
@@ -85,9 +87,43 @@ require_once 'inc/duplicate-doc.php';
 require_once 'inc/staff/staff.php';
 require_once 'inc/template-tags.php';
 require_once 'inc/salary-message.php';
+require_once 'inc/salary-pdf.php';
 require_once 'inc/custom-field-setting/custom-field-salary-normal.php';
 require_once 'inc/custom-field-setting/custom-field-salary-table.php';
 require_once 'inc/custom-field-setting/custom-field-staff.php';
+
+/*
+	PDF発行メタボックス（サイドバー）
+--------------------------------------------- */
+add_action( 'admin_menu', 'bvsl_add_pdf_issue_metabox' );
+function bvsl_add_pdf_issue_metabox() {
+	add_meta_box(
+		'bvsl_pdf_issue',
+		'PDF発行',
+		'bvsl_render_pdf_issue_metabox',
+		'salary',
+		'side',
+		'high'
+	);
+}
+function bvsl_render_pdf_issue_metabox( $post ) {
+	$is_new = ( 'auto-draft' === $post->post_status || 0 === $post->ID );
+	?>
+	<div id="bvsl-pdf-issue-wrap">
+		<button
+			type="button"
+			id="bvsl-pdf-issue-btn"
+			class="button button-primary"
+			<?php echo $is_new ? 'disabled' : ''; ?>
+		>PDF発行</button>
+		<?php if ( $is_new ) : ?>
+		<p style="margin-top:6px;color:#555;font-size:12px;">先に保存してから発行できます。</p>
+		<?php endif; ?>
+		<span id="bvsl-pdf-issue-spinner" class="spinner" style="float:none;display:none;"></span>
+		<p id="bvsl-pdf-issue-message" style="margin-top:6px;"></p>
+	</div>
+	<?php
+}
 
 /*
 	支給分アーカイブページのテンプレートを上書き
