@@ -50,20 +50,19 @@ h1.bill-title {
 	width: 100%;
 	font-size: 16pt;
 	font-weight: bold;
-	margin: 0 0 6pt 0;
+	margin: 0 0 10pt 0;
 	padding: 0 0 3pt 0;
-	border-bottom: 1pt double #000;
 }
 h2.bill-destination {
 	display: block;
 	width: 100%;
 	font-size: 12pt;
-	margin: 0 0 6pt 0;
+	margin: 0 0 10pt 0;
 	padding: 0 0 3pt 0;
-	border-bottom: 1pt solid #000;
 }
 .bill-message {
 	font-size: 9pt;
+	margin-top: 8pt;
 	margin-bottom: 4px;
 }
 .bill-message p {
@@ -184,11 +183,13 @@ h2.bill-destination {
 		}
 		?>
 		</h1>
+		<div style="height:8pt;"></div>
 
 		<?php if ( $post->salary_staff ) : ?>
 		<h2 class="bill-destination">
 			<?php echo esc_html( get_the_title( $post->salary_staff ) ); ?> 様
 		</h2>
+		<div style="height:8pt;"></div>
 		<?php endif; ?>
 
 		<div class="bill-message">
