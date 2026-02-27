@@ -48,7 +48,7 @@ body {
 h1.bill-title {
 	display: block;
 	width: 100%;
-	font-size: 16pt;
+	font-size: 18pt;
 	font-weight: bold;
 	margin: 0 0 20pt 0;
 	padding: 0 0 3pt 0;
@@ -117,6 +117,14 @@ h2.bill-destination {
 	border: 1px solid #aaa;
 	padding: 3px 5px;
 	text-align: left;
+}
+.table-bill tbody th,
+.table-bill tbody td {
+	font-weight: normal;
+}
+.table-bill tbody th b,
+.table-bill tbody td b {
+	font-weight: normal;
 }
 .table-bill thead th {
 	background: #e8e8e8;
