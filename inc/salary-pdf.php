@@ -117,9 +117,10 @@ function bvsl_generate_salary_pdf( $post_id ) {
 			'autoScriptToLang' => true,
 			'autoLangToFont'   => true,  // 日本語グリフ描画に必須。
 			'default_font'     => 'kozgopromedium',
-			// autoLangToFont が日本語に自動選択する明朝体をゴシック体へリダイレクト。
+			// autoLangToFont が日本語に自動選択する明朝体系フォントをゴシック体に強制リダイレクト。
 			'fonttrans'        => array(
-				'kozminproregular' => 'kozgopromedium',
+				'kozminproregular' => 'sjis',
+				'sun-exta'         => 'sjis',
 			),
 		);
 
