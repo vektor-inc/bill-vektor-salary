@@ -32,11 +32,7 @@ if ( $post->salary_document_name ) {
 
 <div class="bill-message">
 <?php
-if ( $post->salary_message ) {
-	$message = $post->salary_message;
-} else {
-	$message = '今月もお疲れ様でした。';
-}
+$message = bvsl_build_salary_message( get_the_ID() );
 
 echo apply_filters( 'the_content', $message );
 ?>

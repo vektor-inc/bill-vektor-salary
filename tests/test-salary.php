@@ -570,4 +570,126 @@ class SalaryTest extends WP_UnitTestCase {
 		}
 	}
 
+	/**
+	 * @since 0.10.0
+	 */
+	function test_bvsl_build_salary_message() {
+		print PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+		print 'bvsl_build_salary_message' . PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+
+		$salary_post_id = self::factory()->post->create(
+			array(
+				'post_title' => 'Salary for message test',
+				'post_type'  => 'salary',
+			)
+		);
+
+		$empty_term = wp_insert_term(
+			'2026年01月分 空',
+			'salary-term',
+			array(
+				'slug' => 'salary-term-empty-message',
+			)
+		);
+		$filled_term = wp_insert_term(
+			'2026年01月分 有',
+			'salary-term',
+			array(
+				'slug' => 'salary-term-filled-message',
+			)
+		);
+
+		$this->assertFalse( is_wp_error( $empty_term ) );
+		$this->assertFalse( is_wp_error( $filled_term ) );
+
+		update_term_meta( $empty_term['term_id'], BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, "　 \n\t" );
+		update_term_meta( $filled_term['term_id'], BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, '共通メッセージ本文' );
+
+		wp_set_object_terms(
+			$salary_post_id,
+			array( (int) $empty_term['term_id'], (int) $filled_term['term_id'] ),
+			'salary-term'
+		);
+
+		$test_cases = array(
+			array(
+				'test_condition_name' => '構成1: 投稿メッセージが非空の場合は投稿メッセージを返す',
+				'conditions'          => array(
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON,
+					'post_message'         => '投稿メッセージ本文',
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => '投稿メッセージ本文',
+			),
+			array(
+				'test_condition_name' => '構成1: 投稿メッセージが空白のみの場合は共通メッセージを返す',
+				'conditions'          => array(
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON,
+					'post_message'         => " \n\t　",
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => '共通メッセージ本文',
+			),
+			array(
+				'test_condition_name' => '構成2: 共通メッセージ + 投稿メッセージの順で返す',
+				'conditions'          => array(
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE,
+					'post_message'         => '投稿メッセージ本文',
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => "共通メッセージ本文\n投稿メッセージ本文",
+			),
+			array(
+				'test_condition_name' => '構成2: 投稿メッセージが空白のみの場合は共通メッセージのみ返す',
+				'conditions'          => array(
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE,
+					'post_message'         => "\n\t　",
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => '共通メッセージ本文',
+			),
+			array(
+				'test_condition_name' => '構成3: 投稿メッセージ + 共通メッセージの順で返す',
+				'conditions'          => array(
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON,
+					'post_message'         => '投稿メッセージ本文',
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => "投稿メッセージ本文\n共通メッセージ本文",
+			),
+			array(
+				'test_condition_name' => '構成3: 投稿メッセージが空白のみの場合は共通メッセージのみ返す',
+				'conditions'          => array(
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON,
+					'post_message'         => "\n\t　",
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => '共通メッセージ本文',
+			),
+			array(
+				'test_condition_name' => '構成1: 共通メッセージも投稿メッセージも空白のみの場合はデフォルト文言を返す',
+				'conditions'          => array(
+					'message_structure'    => BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON,
+					'post_message'         => " \n\t　",
+					'filled_term_message'  => "\n\t　",
+				),
+				'expected'            => '今月もお疲れでした',
+			),
+		);
+
+		foreach ( $test_cases as $case ) {
+			update_term_meta( $filled_term['term_id'], BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, $case['conditions']['filled_term_message'] );
+			update_post_meta( $salary_post_id, 'salary_message_structure', $case['conditions']['message_structure'] );
+			update_post_meta( $salary_post_id, 'salary_message', $case['conditions']['post_message'] );
+
+			$actual = bvsl_build_salary_message( $salary_post_id );
+			print PHP_EOL;
+			print 'actual  :' . $actual . PHP_EOL;
+			print 'expected :' . $case['expected'] . PHP_EOL;
+			$this->assertSame( $case['expected'], $actual, $case['test_condition_name'] );
+		}
+	}
+
 }

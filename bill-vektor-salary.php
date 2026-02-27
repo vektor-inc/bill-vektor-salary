@@ -52,18 +52,39 @@ function bvsl_admin_enqueue_scripts( $hook ) {
 	if ( 'salary' !== $post_type ) {
 		return;
 	}
+
+	$script_path    = plugin_dir_path( __FILE__ ) . 'assets/js/admin-salary.js';
+	$script_version = file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.1';
+
+	$term_messages = array();
+	if ( function_exists( 'bvsl_get_salary_term_common_message_map' ) ) {
+		$term_messages = bvsl_get_salary_term_common_message_map();
+	}
+
 	wp_enqueue_script(
 		'bvsl-admin-salary',
 		plugin_dir_url( __FILE__ ) . 'assets/js/admin-salary.js',
 		array(),
-		'1.0.0',
+		$script_version,
 		true
+	);
+
+	wp_localize_script(
+		'bvsl-admin-salary',
+		'bvslAdminSalary',
+		array(
+			'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
+			'nonce'           => wp_create_nonce( 'bvsl_salary_admin_nonce' ),
+			'commonMessageId' => 'bvsl-common-message-row',
+			'termMessages'    => $term_messages,
+		)
 	);
 }
 
 require_once 'inc/duplicate-doc.php';
 require_once 'inc/staff/staff.php';
 require_once 'inc/template-tags.php';
+require_once 'inc/salary-message.php';
 require_once 'inc/custom-field-setting/custom-field-salary-normal.php';
 require_once 'inc/custom-field-setting/custom-field-salary-table.php';
 require_once 'inc/custom-field-setting/custom-field-staff.php';

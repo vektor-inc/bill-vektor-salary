@@ -143,7 +143,7 @@
 			return;
 		}
 
-		var nenkinTr = nenkinInput.closest( 'tr.cf_item' );
+		var nenkinTr = nenkinInput.closest( 'tr.cf_item' ) || nenkinInput.closest( 'tr' );
 		if ( ! nenkinTr ) {
 			return;
 		}
@@ -229,5 +229,268 @@
 		document.addEventListener( 'DOMContentLoaded', insertRows );
 	} else {
 		insertRows();
+	}
+}() );
+
+/**
+ * 給与明細編集画面 - 支給分の共通メッセージ表示
+ */
+( function () {
+	'use strict';
+	var commonMessageRequestGeneration = 0;
+
+	/**
+	 * 共通メッセージ表示の行IDを返す。
+	 *
+	 * @return {string}
+	 */
+	function getCommonMessageRowId() {
+		if ( window.bvslAdminSalary && window.bvslAdminSalary.commonMessageId ) {
+			return window.bvslAdminSalary.commonMessageId;
+		}
+		return 'bvsl-common-message-row';
+	}
+
+	/**
+	 * 支給分チェックのタームID配列を DOM 順で取得する。
+	 *
+	 * @return {Array}
+	 */
+	function getCheckedTermIds() {
+		var checkboxes = document.querySelectorAll( '#taxonomy-salary-term input[type="checkbox"][name^="tax_input[salary-term]"]' );
+		var termIds = [];
+
+		checkboxes.forEach( function ( checkbox ) {
+			if ( checkbox.checked ) {
+				termIds.push( checkbox.value );
+			}
+		} );
+
+		return termIds;
+	}
+
+	/**
+	 * 共通メッセージ表示行のDOM要素を取得する。
+	 *
+	 * @return {Element|null}
+	 */
+	function getCommonMessageRow() {
+		return document.getElementById( getCommonMessageRowId() );
+	}
+
+	/**
+	 * メッセージが空白のみかを判定する。
+	 *
+	 * @param {string} message 判定対象
+	 * @return {boolean}
+	 */
+	function isBlankMessage( message ) {
+		if ( null === message || typeof message === 'undefined' ) {
+			return true;
+		}
+		return String( message ).replace( /[\s\u3000]+/g, '' ) === '';
+	}
+
+	/**
+	 * メッセージ入力欄の行要素を取得する。
+	 *
+	 * @return {Element|null}
+	 */
+	function findMessageRow() {
+		var messageField = document.getElementById( 'salary_message' ) ||
+			document.querySelector( 'textarea[name="salary_message"]' ) ||
+			document.querySelector( 'textarea[id*="salary_message"]' );
+
+		if ( messageField ) {
+			return messageField.closest( 'tr.cf_item' ) || messageField.closest( 'tr' );
+		}
+
+		// フィールドID差異があるケースに備えて、ラベル文字列でも補助探索する。
+		var labels = document.querySelectorAll( '.postbox th, .postbox label' );
+		for ( var i = 0; i < labels.length; i++ ) {
+			if ( labels[ i ].textContent && labels[ i ].textContent.replace( /\s+/g, '' ) === 'メッセージ' ) {
+				return labels[ i ].closest( 'tr' );
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * ローカライズ済みの共通メッセージから、先頭の非空メッセージを取得する。
+	 *
+	 * @param {Array} termIds チェック済みタームID配列
+	 * @return {string}
+	 */
+	function getLocalizedCommonMessage( termIds ) {
+		if ( ! window.bvslAdminSalary || ! window.bvslAdminSalary.termMessages ) {
+			return '';
+		}
+
+		var termMessages = window.bvslAdminSalary.termMessages;
+		for ( var i = 0; i < termIds.length; i++ ) {
+			var termId = String( termIds[ i ] );
+			if ( termMessages[ termId ] && ! isBlankMessage( termMessages[ termId ] ) ) {
+				return String( termMessages[ termId ] );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * 共通メッセージ表示行を、メッセージ入力欄の直前に追加する。
+	 *
+	 * @return {Element|null}
+	 */
+	function ensureCommonMessageRow() {
+		var existing = getCommonMessageRow();
+		if ( existing ) {
+			return existing;
+		}
+
+		var messageTr = findMessageRow();
+		if ( ! messageTr || ! messageTr.parentNode ) {
+			return null;
+		}
+
+		var row = document.createElement( 'tr' );
+		row.id = getCommonMessageRowId();
+		row.className = 'cf_item';
+		row.style.display = 'none';
+		row.innerHTML =
+			'<th class="text-nowrap"><label>共通メッセージ（支給分）</label></th>' +
+			'<td><div id="bvsl-common-message-content" style="white-space: pre-wrap;"></div></td>';
+
+		messageTr.parentNode.insertBefore( row, messageTr );
+		return row;
+	}
+
+	/**
+	 * 共通メッセージを画面へ反映する。
+	 *
+	 * @param {string} commonMessage 表示メッセージ
+	 * @return {void}
+	 */
+	function renderCommonMessage( commonMessage ) {
+		var row = ensureCommonMessageRow();
+		if ( ! row ) {
+			return;
+		}
+
+		var content = row.querySelector( '#bvsl-common-message-content' );
+		if ( ! content ) {
+			return;
+		}
+
+		if ( ! isBlankMessage( commonMessage ) ) {
+			content.textContent = commonMessage;
+			row.style.display = '';
+			return;
+		}
+
+		content.textContent = '';
+		row.style.display = 'none';
+	}
+
+	/**
+	 * Ajaxで共通メッセージを取得する。
+	 *
+	 * @param {Array} termIds チェック済みタームID配列
+	 * @return {Promise<string>}
+	 */
+	function fetchCommonMessage( termIds ) {
+		if ( ! window.bvslAdminSalary || ! window.bvslAdminSalary.ajaxUrl || ! window.bvslAdminSalary.nonce ) {
+			return Promise.resolve( '' );
+		}
+
+		var formData = new window.FormData();
+		formData.append( 'action', 'bvsl_get_salary_term_common_message' );
+		formData.append( 'nonce', window.bvslAdminSalary.nonce );
+		termIds.forEach( function ( termId ) {
+			formData.append( 'term_ids[]', termId );
+		} );
+
+		return window.fetch( window.bvslAdminSalary.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: formData,
+		} )
+			.then( function ( response ) {
+				return response.json();
+			} )
+			.then( function ( json ) {
+				if ( ! json || ! json.success || ! json.data ) {
+					return '';
+				}
+				return json.data.common_message || '';
+			} )
+			.catch( function () {
+				return '';
+			} );
+	}
+
+	/**
+	 * 共通メッセージ表示を最新状態に更新する。
+	 *
+	 * @return {void}
+	 */
+	function updateCommonMessage() {
+		var termIds = getCheckedTermIds();
+		if ( ! termIds.length ) {
+			commonMessageRequestGeneration++;
+			renderCommonMessage( '' );
+			return;
+		}
+
+		var localizedCommonMessage = getLocalizedCommonMessage( termIds );
+		if ( ! isBlankMessage( localizedCommonMessage ) ) {
+			renderCommonMessage( localizedCommonMessage );
+		}
+
+		commonMessageRequestGeneration++;
+		var requestGeneration = commonMessageRequestGeneration;
+
+		fetchCommonMessage( termIds ).then( function ( commonMessage ) {
+			if ( requestGeneration !== commonMessageRequestGeneration ) {
+				return;
+			}
+
+			if ( ! isBlankMessage( commonMessage ) ) {
+				renderCommonMessage( commonMessage );
+				return;
+			}
+			renderCommonMessage( localizedCommonMessage );
+		} );
+	}
+
+	/**
+	 * イベントを設定する。
+	 *
+	 * @return {void}
+	 */
+	function initCommonMessage() {
+		ensureCommonMessageRow();
+		updateCommonMessage();
+
+		// 動的UI更新にも追従できるようイベント委譲で監視する。
+		document.addEventListener( 'change', function ( event ) {
+			var target = event.target;
+			if ( target && target.matches( '#taxonomy-salary-term input[type="checkbox"][name^="tax_input[salary-term]"]' ) ) {
+				updateCommonMessage();
+			}
+		} );
+
+		// 画面描画タイミング差分に備えて初回だけ再試行する。
+		window.setTimeout( function () {
+			ensureCommonMessageRow();
+			updateCommonMessage();
+		}, 300 );
+	}
+
+	if ( document.readyState === 'loading' ) {
+		document.addEventListener( 'DOMContentLoaded', initCommonMessage );
+	} else {
+		initCommonMessage();
 	}
 }() );

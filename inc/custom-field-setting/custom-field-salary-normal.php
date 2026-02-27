@@ -32,11 +32,21 @@ class Salary_Normal_Custom_Fields {
 		VK_Custom_Field_Builder::form_table( $custom_fields_array, $befor_custom_fields );
 	}
 
-	public static function save_custom_fields() {
+	public static function save_custom_fields( $post_id = 0 ) {
+		if ( 'salary' !== get_post_type( $post_id ) ) {
+			return;
+		}
+
 		$custom_fields_array = Salary_Normal_Custom_Fields::custom_fields_array();
 		// $custom_fields_array_no_cf_builder = arra();
 		// $custom_fields_all_array = array_merge(  $custom_fields_array, $custom_fields_array_no_cf_builder );
 		VK_Custom_Field_Builder::save_cf_value( $custom_fields_array );
+
+		// 新規作成時など未選択の場合でも、メッセージ構成は既定値を保存する。
+		$message_structure = (string) get_post_meta( $post_id, 'salary_message_structure', true );
+		if ( '' === $message_structure ) {
+			update_post_meta( $post_id, 'salary_message_structure', BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON );
+		}
 	}
 
 	public static function custom_fields_array() {
@@ -87,7 +97,18 @@ class Salary_Normal_Custom_Fields {
 			'salary_message'       => array(
 				'label'       => 'メッセージ',
 				'type'        => 'textarea',
-				'description' => '※未記入の場合は「今月もお疲れ様でした。」になります。',
+				'description' => '※ 共通メッセージもメッセージも両方未記入の場合は、「今月もお疲れでした」になります。',
+				'required'    => false,
+			),
+			'salary_message_structure' => array(
+				'label'       => 'メッセージ構成',
+				'type'        => 'radio',
+				'description' => '',
+				'options'     => array(
+					BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_OR_COMMON => 'メッセージの内容を反映。メッセージ が空の場合はタクソノミー「支給分」の「共通メッセージ」の内容を反映。',
+					BVSL_SALARY_MESSAGE_STRUCTURE_COMMON_THEN_MESSAGE => '共通メッセージ + メッセージ',
+					BVSL_SALARY_MESSAGE_STRUCTURE_MESSAGE_THEN_COMMON => 'メッセージ + 共通メッセージ',
+				),
 				'required'    => false,
 			),
 			'salary_remarks'       => array(
