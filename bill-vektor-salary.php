@@ -156,6 +156,52 @@ function bill_add_post_type_salaly() {
 			'show_ui'               => true,
 		)
 	);
+	register_taxonomy(
+		'salary-type',
+		'salary',
+		array(
+			'hierarchical'          => true,
+			'update_count_callback' => '_update_post_term_count',
+			'label'                 => '給与種別',
+			'singular_label'        => '給与種別',
+			'public'                => true,
+			'show_ui'               => true,
+			'capabilities'          => array(
+				// 追加・編集・削除を不可にし、既存タームの割り当てのみ許可する。
+				'manage_terms' => 'do_not_allow',
+				'edit_terms'   => 'do_not_allow',
+				'delete_terms' => 'do_not_allow',
+				'assign_terms' => 'edit_posts',
+			),
+		)
+	);
+
+	bvsl_ensure_salary_type_terms();
+}
+
+/**
+ * 給与種別タクソノミーの固定タームを作成する。
+ *
+ * @return void
+ */
+function bvsl_ensure_salary_type_terms() {
+	$fixed_terms = array(
+		'bvsl-salary' => '給与',
+		'bvsl-bonus'  => '賞与',
+	);
+
+	foreach ( $fixed_terms as $slug => $name ) {
+		$term = get_term_by( 'slug', $slug, 'salary-type' );
+		if ( ! $term ) {
+			wp_insert_term(
+				$name,
+				'salary-type',
+				array(
+					'slug' => $slug,
+				)
+			);
+		}
+	}
 }
 
 function bill_remove_meta_boxes_comment() {
