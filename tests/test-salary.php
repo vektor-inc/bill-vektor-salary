@@ -613,55 +613,83 @@ class SalaryTest extends WP_UnitTestCase {
 			'salary-term'
 		);
 
-		$test_data = array(
+		$test_cases = array(
 			array(
-				'message_structure' => '1',
-				'post_message'      => '投稿メッセージ本文',
-				'expected'          => '投稿メッセージ本文',
+				'test_condition_name' => '構成1: 投稿メッセージが非空の場合は投稿メッセージを返す',
+				'conditions'          => array(
+					'message_structure'    => '1',
+					'post_message'         => '投稿メッセージ本文',
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => '投稿メッセージ本文',
 			),
 			array(
-				'message_structure' => '1',
-				'post_message'      => " \n\t　",
-				'expected'          => '共通メッセージ本文',
+				'test_condition_name' => '構成1: 投稿メッセージが空白のみの場合は共通メッセージを返す',
+				'conditions'          => array(
+					'message_structure'    => '1',
+					'post_message'         => " \n\t　",
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => '共通メッセージ本文',
 			),
 			array(
-				'message_structure' => '2',
-				'post_message'      => '投稿メッセージ本文',
-				'expected'          => "共通メッセージ本文\n投稿メッセージ本文",
+				'test_condition_name' => '構成2: 共通メッセージ + 投稿メッセージの順で返す',
+				'conditions'          => array(
+					'message_structure'    => '2',
+					'post_message'         => '投稿メッセージ本文',
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => "共通メッセージ本文\n投稿メッセージ本文",
 			),
 			array(
-				'message_structure' => '2',
-				'post_message'      => "\n\t　",
-				'expected'          => '共通メッセージ本文',
+				'test_condition_name' => '構成2: 投稿メッセージが空白のみの場合は共通メッセージのみ返す',
+				'conditions'          => array(
+					'message_structure'    => '2',
+					'post_message'         => "\n\t　",
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => '共通メッセージ本文',
 			),
 			array(
-				'message_structure' => '3',
-				'post_message'      => '投稿メッセージ本文',
-				'expected'          => "投稿メッセージ本文\n共通メッセージ本文",
+				'test_condition_name' => '構成3: 投稿メッセージ + 共通メッセージの順で返す',
+				'conditions'          => array(
+					'message_structure'    => '3',
+					'post_message'         => '投稿メッセージ本文',
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => "投稿メッセージ本文\n共通メッセージ本文",
 			),
 			array(
-				'message_structure' => '3',
-				'post_message'      => "\n\t　",
-				'expected'          => '共通メッセージ本文',
+				'test_condition_name' => '構成3: 投稿メッセージが空白のみの場合は共通メッセージのみ返す',
+				'conditions'          => array(
+					'message_structure'    => '3',
+					'post_message'         => "\n\t　",
+					'filled_term_message'  => '共通メッセージ本文',
+				),
+				'expected'            => '共通メッセージ本文',
+			),
+			array(
+				'test_condition_name' => '構成1: 共通メッセージも投稿メッセージも空白のみの場合はデフォルト文言を返す',
+				'conditions'          => array(
+					'message_structure'    => '1',
+					'post_message'         => " \n\t　",
+					'filled_term_message'  => "\n\t　",
+				),
+				'expected'            => '今月もお疲れでした',
 			),
 		);
 
-		foreach ( $test_data as $test_value ) {
-			update_post_meta( $salary_post_id, 'salary_message_structure', $test_value['message_structure'] );
-			update_post_meta( $salary_post_id, 'salary_message', $test_value['post_message'] );
+		foreach ( $test_cases as $case ) {
+			update_term_meta( $filled_term['term_id'], BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, $case['conditions']['filled_term_message'] );
+			update_post_meta( $salary_post_id, 'salary_message_structure', $case['conditions']['message_structure'] );
+			update_post_meta( $salary_post_id, 'salary_message', $case['conditions']['post_message'] );
 
 			$actual = bvsl_build_salary_message( $salary_post_id );
 			print PHP_EOL;
 			print 'actual  :' . $actual . PHP_EOL;
-			print 'expected :' . $test_value['expected'] . PHP_EOL;
-			$this->assertSame( $test_value['expected'], $actual );
+			print 'expected :' . $case['expected'] . PHP_EOL;
+			$this->assertSame( $case['expected'], $actual, $case['test_condition_name'] );
 		}
-
-		// 共通メッセージも投稿メッセージも空白のみの場合はデフォルト文言を返す。
-		update_term_meta( $filled_term['term_id'], BVSL_SALARY_TERM_COMMON_MESSAGE_META_KEY, "\n\t　" );
-		update_post_meta( $salary_post_id, 'salary_message_structure', '1' );
-		update_post_meta( $salary_post_id, 'salary_message', " \n\t　" );
-		$this->assertSame( '今月もお疲れでした', bvsl_build_salary_message( $salary_post_id ) );
 	}
 
 }
