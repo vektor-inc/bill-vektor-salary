@@ -569,11 +569,11 @@
 		var tr = document.createElement( 'tr' );
 		tr.dataset.attachmentId = String( data.attachment_id );
 		tr.innerHTML =
-			'<td>' + formatIssuedAt( data.issued_at ) + '</td>' +
+			'<td>' + escapeHtml( formatIssuedAt( data.issued_at ) ) + '</td>' +
 			'<td>' + escapeHtml( data.filename ) + '</td>' +
 			'<td>' +
 				'<button type="button" class="button button-small bvsl-pdf-delete-btn" data-attachment-id="' + data.attachment_id + '">削除</button>' +
-				'<a href="' + escapeHtml( data.pdf_url ) + '" target="_blank" class="button button-small" style="margin-left:4px;">プレビュー</a>' +
+				'<a href="' + escapeHtml( data.pdf_url ) + '" target="_blank" rel="noopener noreferrer" class="button button-small" style="margin-left:4px;">プレビュー</a>' +
 			'</td>';
 
 		tbody.insertBefore( tr, tbody.firstChild );
