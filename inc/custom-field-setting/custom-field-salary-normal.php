@@ -35,6 +35,11 @@ class Salary_Normal_Custom_Fields {
 		if ( function_exists( 'bvsl_render_pdf_history_table' ) && $post && $post->ID ) {
 			bvsl_render_pdf_history_table( $post->ID );
 		}
+
+		// メール送信履歴テーブルをフォームテーブル直後に追加。
+		if ( function_exists( 'bvsl_render_mail_history_table' ) && $post && $post->ID ) {
+			bvsl_render_mail_history_table( $post->ID );
+		}
 	}
 
 	public static function save_custom_fields( $post_id = 0 ) {
