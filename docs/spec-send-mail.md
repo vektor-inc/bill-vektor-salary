@@ -348,9 +348,9 @@
     'sent_at'         => '2026-03-03 10:30:00',
     'status'          => 'success', // success / failed
     'to'              => 'staff@example.com',
-    'subject'         => '給与明細のお知らせ（2026年2月分）',
-    'attachment_id'   => 123, // 添付なしの場合は 0
-    'attachment_name' => 'salary-456-20260227160000.pdf',
+    'subject'         => '【給与明細】 2026年2月分 山田 太郎 様',
+    'attachment_id'   => 0, // 添付なしの場合は 0
+    'attachment_name' => '', // 添付なしの場合は空文字
     'error_message'   => '', // failed時のみ値を入れる
   ],
   // 新しい履歴を先頭に追加（array_unshift）

@@ -132,6 +132,70 @@ function bvsl_build_salary_mail_body( $post_id ) {
 }
 
 /**
+ * 添付IDが給与明細のPDF履歴に含まれるかを判定する。
+ *
+ * @param int $post_id       給与明細投稿ID。
+ * @param int $attachment_id 添付ID。
+ * @return bool 含まれる場合はtrue。
+ */
+function bvsl_is_salary_pdf_history_attachment( $post_id, $attachment_id ) {
+	$history = get_post_meta( $post_id, BVSL_PDF_HISTORY_META_KEY, true );
+	if ( empty( $history ) || ! is_array( $history ) ) {
+		return false;
+	}
+
+	foreach ( $history as $record ) {
+		$history_attachment_id = isset( $record['attachment_id'] ) ? (int) $record['attachment_id'] : 0;
+		if ( $history_attachment_id === (int) $attachment_id ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * 指定添付IDがメール送信に利用可能な給与PDFかを判定する。
+ *
+ * 判定条件:
+ * - attachment 投稿であること
+ * - MIMEタイプが application/pdf であること
+ * - ファイルが実在すること
+ * - 対象給与明細との関連があること（post_parent 一致 or PDF履歴に存在）
+ *
+ * @param int $post_id       給与明細投稿ID。
+ * @param int $attachment_id 添付ID。
+ * @return bool 利用可能な場合はtrue。
+ */
+function bvsl_is_valid_salary_mail_attachment( $post_id, $attachment_id ) {
+	$attachment_id = (int) $attachment_id;
+	if ( $attachment_id <= 0 ) {
+		return false;
+	}
+
+	$attachment_post = get_post( $attachment_id );
+	if ( ! $attachment_post || 'attachment' !== $attachment_post->post_type ) {
+		return false;
+	}
+
+	if ( 'application/pdf' !== get_post_mime_type( $attachment_id ) ) {
+		return false;
+	}
+
+	$file_path = get_attached_file( $attachment_id );
+	if ( ! $file_path || ! file_exists( $file_path ) ) {
+		return false;
+	}
+
+	$has_relation = ( (int) $attachment_post->post_parent === (int) $post_id ) || bvsl_is_salary_pdf_history_attachment( $post_id, $attachment_id );
+	if ( ! $has_relation ) {
+		return false;
+	}
+
+	return true;
+}
+
+/**
  * PDF履歴から最新の有効なattachment_idを返す。
  *
  * @param int $post_id 給与明細投稿ID。
@@ -149,8 +213,7 @@ function bvsl_get_latest_valid_salary_pdf_attachment_id( $post_id ) {
 			continue;
 		}
 
-		$file_path = get_attached_file( $attachment_id );
-		if ( $file_path && file_exists( $file_path ) ) {
+		if ( bvsl_is_valid_salary_mail_attachment( $post_id, $attachment_id ) ) {
 			return $attachment_id;
 		}
 	}
@@ -170,8 +233,7 @@ function bvsl_resolve_salary_mail_attachment_id( $post_id, $attachment_id = 0 ) 
 	$attachment_id = (int) $attachment_id;
 
 	if ( $attachment_id > 0 ) {
-		$file_path = get_attached_file( $attachment_id );
-		if ( $file_path && file_exists( $file_path ) ) {
+		if ( bvsl_is_valid_salary_mail_attachment( $post_id, $attachment_id ) ) {
 			return $attachment_id;
 		}
 	}
@@ -219,6 +281,31 @@ function bvsl_add_salary_mail_history_record( $post_id, $record ) {
 }
 
 /**
+ * メール送信失敗履歴を投稿メタへ保存する。
+ *
+ * @param int    $post_id          給与明細投稿ID。
+ * @param string $to               宛先メールアドレス。
+ * @param string $subject          件名。
+ * @param int    $attachment_id    添付ID。
+ * @param string $attachment_name  添付ファイル名。
+ * @param string $error_message    失敗理由。
+ * @return void
+ */
+function bvsl_add_salary_mail_failure_history_record( $post_id, $to, $subject, $attachment_id, $attachment_name, $error_message ) {
+	$record = array(
+		'sent_at'         => current_time( 'Y-m-d H:i:s' ),
+		'status'          => 'failed',
+		'to'              => (string) $to,
+		'subject'         => (string) $subject,
+		'attachment_id'   => (int) $attachment_id,
+		'attachment_name' => (string) $attachment_name,
+		'error_message'   => (string) $error_message,
+	);
+
+	bvsl_add_salary_mail_history_record( $post_id, $record );
+}
+
+/**
  * 給与明細メールを送信する。
  *
  * @param int   $post_id 給与明細投稿ID。
@@ -236,14 +323,16 @@ function bvsl_send_salary_mail( $post_id, $args = array() ) {
 		return new WP_Error( 'invalid_post', '給与明細投稿が見つかりません。' );
 	}
 
-	$to = bvsl_get_salary_staff_email( $post_id );
-	if ( '' === $to ) {
-		return new WP_Error( 'email_not_found', 'スタッフのメールアドレスが未設定、または不正です。' );
-	}
-
 	$subject = isset( $args['subject'] ) ? sanitize_text_field( (string) $args['subject'] ) : '';
 	if ( '' === $subject ) {
 		$subject = bvsl_build_salary_mail_subject( $post_id );
+	}
+
+	$to = bvsl_get_salary_staff_email( $post_id );
+	if ( '' === $to ) {
+		$error = new WP_Error( 'email_not_found', 'スタッフのメールアドレスが未設定、または不正です。' );
+		bvsl_add_salary_mail_failure_history_record( $post_id, '', $subject, 0, '', $error->get_error_message() );
+		return $error;
 	}
 
 	$message = bvsl_build_salary_mail_body( $post_id );
@@ -251,12 +340,15 @@ function bvsl_send_salary_mail( $post_id, $args = array() ) {
 	$requested_attachment_id = isset( $args['attachment_id'] ) ? (int) $args['attachment_id'] : 0;
 	$attachment_id           = bvsl_resolve_salary_mail_attachment_id( $post_id, $requested_attachment_id );
 	if ( is_wp_error( $attachment_id ) ) {
+		bvsl_add_salary_mail_failure_history_record( $post_id, $to, $subject, $requested_attachment_id, '', $attachment_id->get_error_message() );
 		return $attachment_id;
 	}
 
 	$attachment_path = get_attached_file( $attachment_id );
 	if ( ! $attachment_path || ! file_exists( $attachment_path ) ) {
-		return new WP_Error( 'attachment_not_found', '添付PDFファイルが見つかりません。' );
+		$error = new WP_Error( 'attachment_not_found', '添付PDFファイルが見つかりません。' );
+		bvsl_add_salary_mail_failure_history_record( $post_id, $to, $subject, $attachment_id, '', $error->get_error_message() );
+		return $error;
 	}
 
 	$headers = array();

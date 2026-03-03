@@ -133,7 +133,12 @@ function bvsl_render_pdf_issue_in_submitbox( $post ) {
 	if ( 'salary' !== get_post_type( $post ) ) {
 		return;
 	}
-	$is_new = ( 'auto-draft' === $post->post_status || 0 === $post->ID );
+	$is_new          = ( 'auto-draft' === $post->post_status || 0 === $post->ID );
+	$recipient_email = '';
+	if ( ! $is_new && function_exists( 'bvsl_get_salary_staff_email' ) ) {
+		$recipient_email = (string) bvsl_get_salary_staff_email( $post->ID );
+	}
+	$is_mail_disabled = $is_new || '' === $recipient_email;
 	?>
 	<div id="bvsl-pdf-issue-wrap" style="padding: 10px; border-top: 1px solid #dcdcde;">
 		<button
@@ -155,9 +160,12 @@ function bvsl_render_pdf_issue_in_submitbox( $post ) {
 			type="button"
 			id="bvsl-mail-preview-btn"
 			class="button button-secondary"
-			<?php echo $is_new ? 'disabled' : ''; ?>
+			<?php echo $is_mail_disabled ? 'disabled' : ''; ?>
 			style="width: 100%; display: block; text-align: center; margin-top: 8px;"
 		>送信プレビュー</button>
+		<?php if ( ! $is_new && '' === $recipient_email ) : ?>
+		<p style="margin-top:6px;color:#555;font-size:12px;">スタッフのメールアドレスを設定してください。</p>
+		<?php endif; ?>
 		<div style="display:flex; align-items:center; margin-top:6px;">
 			<span id="bvsl-mail-send-spinner" class="spinner" style="float:none; display:none; margin:0 8px 0 0;"></span>
 			<p id="bvsl-mail-send-message" style="margin:0; text-align:left;"></p>
