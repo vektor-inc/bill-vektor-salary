@@ -11,6 +11,9 @@
 
 global $post;
 ?>
+<?php if ( empty( $bvsl_pdf_mode ) ) : ?>
+<div class="container">
+<?php endif; ?>
 <?php if ( $post->salary_remarks ) : ?>
 <dl class="bill-remarks">
 	<dt>備考</dt>
@@ -45,3 +48,7 @@ if ( isset( $options['own-logo'] ) && $options['own-logo'] ) {
 }
 ?>
 </div>
+
+<?php if ( empty( $bvsl_pdf_mode ) ) : ?>
+</div>
+<?php endif; ?>
