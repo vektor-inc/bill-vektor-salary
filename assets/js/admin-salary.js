@@ -494,3 +494,244 @@
 		initCommonMessage();
 	}
 }() );
+
+/**
+ * 給与明細編集画面 - PDF発行・削除
+ */
+( function () {
+	'use strict';
+
+	/**
+	 * 日時文字列（Y-m-d H:i:s）を Y/m/d H:i 形式に変換する。
+	 *
+	 * @param {string} issuedAt
+	 * @return {string}
+	 */
+	function formatIssuedAt( issuedAt ) {
+		if ( ! issuedAt ) {
+			return '';
+		}
+		// "2026-02-27 16:00:00" → "2026/02/27 16:00"
+		return issuedAt.replace( /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}).*$/, '$1/$2/$3 $4:$5' );
+	}
+
+	/**
+	 * PDF履歴テーブルの tbody を取得、なければ作成する。
+	 *
+	 * @return {Element|null}
+	 */
+	function ensurePdfHistoryTable() {
+		var tbody = document.getElementById( 'bvsl-pdf-history-tbody' );
+		if ( tbody ) {
+			return tbody;
+		}
+
+		// テーブルがない場合は新規作成
+		var wrap = document.getElementById( 'bvsl-pdf-history-wrap' );
+		if ( ! wrap ) {
+			var metaBox = document.getElementById( 'meta_box_bill_normal' );
+			if ( ! metaBox ) {
+				return null;
+			}
+			var insideEl = metaBox.querySelector( '.inside' ) || metaBox;
+
+			wrap = document.createElement( 'div' );
+			wrap.id = 'bvsl-pdf-history-wrap';
+			wrap.style.marginTop = '16px';
+			wrap.innerHTML =
+				'<h4 style="margin-bottom:6px;">発行済みPDF履歴</h4>' +
+				'<table class="widefat striped">' +
+					'<thead><tr>' +
+						'<th>発行日時</th>' +
+						'<th>ファイル名</th>' +
+						'<th>操作</th>' +
+					'</tr></thead>' +
+					'<tbody id="bvsl-pdf-history-tbody"></tbody>' +
+				'</table>';
+			insideEl.appendChild( wrap );
+		}
+
+		return document.getElementById( 'bvsl-pdf-history-tbody' );
+	}
+
+	/**
+	 * 発行済みPDF履歴テーブルに新しい行を先頭に追加する。
+	 *
+	 * @param {Object} data { pdf_url, attachment_id, filename, issued_at }
+	 * @return {void}
+	 */
+	function prependPdfHistoryRow( data ) {
+		var tbody = ensurePdfHistoryTable();
+		if ( ! tbody ) {
+			return;
+		}
+
+		var tr = document.createElement( 'tr' );
+		tr.dataset.attachmentId = String( data.attachment_id );
+		tr.innerHTML =
+			'<td>' + escapeHtml( formatIssuedAt( data.issued_at ) ) + '</td>' +
+			'<td>' + escapeHtml( data.filename ) + '</td>' +
+			'<td>' +
+				'<button type="button" class="button button-small bvsl-pdf-delete-btn" data-attachment-id="' + data.attachment_id + '">削除</button>' +
+				'<a href="' + escapeHtml( data.pdf_url ) + '" target="_blank" rel="noopener noreferrer" class="button button-small" style="margin-left:4px;">プレビュー</a>' +
+			'</td>';
+
+		tbody.insertBefore( tr, tbody.firstChild );
+	}
+
+	/**
+	 * 文字列をHTMLエスケープする。
+	 *
+	 * @param {string} str
+	 * @return {string}
+	 */
+	function escapeHtml( str ) {
+		return String( str )
+			.replace( /&/g, '&amp;' )
+			.replace( /</g, '&lt;' )
+			.replace( />/g, '&gt;' )
+			.replace( /"/g, '&quot;' );
+	}
+
+	/**
+	 * PDF発行ボタンのクリックハンドラ。
+	 *
+	 * @return {void}
+	 */
+	function handlePdfIssue() {
+		var btn     = document.getElementById( 'bvsl-pdf-issue-btn' );
+		var spinner = document.getElementById( 'bvsl-pdf-issue-spinner' );
+		var message = document.getElementById( 'bvsl-pdf-issue-message' );
+
+		if ( ! btn ) {
+			return;
+		}
+
+		btn.addEventListener( 'click', function () {
+			if ( ! window.bvslAdminSalary || ! window.bvslAdminSalary.pdfNonce ) {
+				return;
+			}
+
+			var postId = window.bvslAdminSalary.postId;
+			if ( ! postId ) {
+				return;
+			}
+
+			btn.disabled = true;
+			if ( spinner ) {
+				spinner.style.display = 'inline-block';
+			}
+			if ( message ) {
+				message.textContent = '';
+			}
+
+			var formData = new window.FormData();
+			formData.append( 'action', 'bvsl_generate_salary_pdf' );
+			formData.append( 'nonce', window.bvslAdminSalary.pdfNonce );
+			formData.append( 'post_id', postId );
+
+			window.fetch( window.bvslAdminSalary.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: formData,
+			} )
+				.then( function ( res ) {
+					return res.json();
+				} )
+				.then( function ( json ) {
+					if ( json && json.success && json.data ) {
+						prependPdfHistoryRow( json.data );
+						if ( message ) {
+							message.style.color = '#46b450';
+							message.textContent = 'PDFを発行しました。';
+						}
+					} else {
+						var errMsg = ( json && json.data && json.data.message ) ? json.data.message : 'PDF発行に失敗しました。';
+						if ( message ) {
+							message.style.color = '#dc3232';
+							message.textContent = errMsg;
+						}
+					}
+				} )
+				.catch( function () {
+					if ( message ) {
+						message.style.color = '#dc3232';
+						message.textContent = '通信エラーが発生しました。';
+					}
+				} )
+				.finally( function () {
+					btn.disabled = false;
+					if ( spinner ) {
+						spinner.style.display = 'none';
+					}
+				} );
+		} );
+	}
+
+	/**
+	 * PDF削除ボタンのクリックハンドラ（イベント委譲）。
+	 *
+	 * @return {void}
+	 */
+	function handlePdfDelete() {
+		document.addEventListener( 'click', function ( event ) {
+			var target = event.target;
+			if ( ! target || ! target.classList.contains( 'bvsl-pdf-delete-btn' ) ) {
+				return;
+			}
+
+			if ( ! window.confirm( 'このPDFを削除しますか？この操作は元に戻せません。' ) ) {
+				return;
+			}
+
+			if ( ! window.bvslAdminSalary || ! window.bvslAdminSalary.pdfNonce ) {
+				return;
+			}
+
+			var attachmentId = target.dataset.attachmentId;
+			var postId       = window.bvslAdminSalary.postId;
+			var tr           = target.closest( 'tr' );
+
+			target.disabled = true;
+
+			var formData = new window.FormData();
+			formData.append( 'action', 'bvsl_delete_salary_pdf' );
+			formData.append( 'nonce', window.bvslAdminSalary.pdfNonce );
+			formData.append( 'post_id', postId );
+			formData.append( 'attachment_id', attachmentId );
+
+			window.fetch( window.bvslAdminSalary.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: formData,
+			} )
+				.then( function ( res ) {
+					return res.json();
+				} )
+				.then( function ( json ) {
+					if ( json && json.success ) {
+						if ( tr ) {
+							tr.parentNode.removeChild( tr );
+						}
+					} else {
+						window.alert( 'PDFの削除に失敗しました。' );
+						target.disabled = false;
+					}
+				} )
+				.catch( function () {
+					window.alert( '通信エラーが発生しました。' );
+					target.disabled = false;
+				} );
+		} );
+	}
+
+	if ( document.readyState === 'loading' ) {
+		document.addEventListener( 'DOMContentLoaded', function () {
+			handlePdfIssue();
+			handlePdfDelete();
+		} );
+	} else {
+		handlePdfIssue();
+		handlePdfDelete();
+	}
+}() );

@@ -30,6 +30,11 @@ class Salary_Normal_Custom_Fields {
 		$custom_fields_array = Salary_Normal_Custom_Fields::custom_fields_array();
 		$befor_custom_fields = '';
 		VK_Custom_Field_Builder::form_table( $custom_fields_array, $befor_custom_fields );
+
+		// PDF履歴テーブルをフォームテーブル直後に追加。
+		if ( function_exists( 'bvsl_render_pdf_history_table' ) && $post && $post->ID ) {
+			bvsl_render_pdf_history_table( $post->ID );
+		}
 	}
 
 	public static function save_custom_fields( $post_id = 0 ) {
@@ -124,9 +129,9 @@ class Salary_Normal_Custom_Fields {
 				'required'    => false,
 			),
 			'salary_send_pdf'      => array(
-				'label'       => '発行済PDF',
+				'label'       => '発行済PDF（非推奨）',
 				'type'        => 'file',
-				'description' => '発行したPDFファイルを保存しておく場合に登録してください。',
+				'description' => '手動登録されたPDF URL。上記の「PDF発行」機能をご利用ください。',
 				'hidden'      => true,
 			),
 		// 'event_image_main' => array(

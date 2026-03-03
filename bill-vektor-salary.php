@@ -8,6 +8,7 @@
  * Text Domain:     bill-vektor-salary
  * Domain Path:     /languages
  * Version:         0.10.0
+ * Requires PHP:    8.0
  *
  * @package         Bill_Vektor_Salary
  */
@@ -75,8 +76,10 @@ function bvsl_admin_enqueue_scripts( $hook ) {
 		array(
 			'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
 			'nonce'           => wp_create_nonce( 'bvsl_salary_admin_nonce' ),
+			'pdfNonce'        => wp_create_nonce( 'bvsl_generate_salary_pdf_nonce' ),
 			'commonMessageId' => 'bvsl-common-message-row',
 			'termMessages'    => $term_messages,
+			'postId'          => $post_id,
 		)
 	);
 }
@@ -85,9 +88,69 @@ require_once 'inc/duplicate-doc.php';
 require_once 'inc/staff/staff.php';
 require_once 'inc/template-tags.php';
 require_once 'inc/salary-message.php';
+require_once 'inc/salary-pdf.php';
 require_once 'inc/custom-field-setting/custom-field-salary-normal.php';
 require_once 'inc/custom-field-setting/custom-field-salary-table.php';
 require_once 'inc/custom-field-setting/custom-field-staff.php';
+
+/*
+	PDFテンプレート ブラウザプレビュー
+	?bvsl_pdf_preview=1&post_id={post_id} で管理者がブラウザで HTML を確認できる。
+	DevTools で CSS を調整してから frame-salary-pdf.php に反映する用途。
+--------------------------------------------- */
+add_action(
+	'template_redirect',
+	function () {
+		if ( ! isset( $_GET['bvsl_pdf_preview'] ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( 'Permission denied.' );
+		}
+		$post_id = isset( $_GET['post_id'] ) ? (int) $_GET['post_id'] : 0;
+		if ( ! $post_id ) {
+			wp_die( 'post_id が指定されていません。' );
+		}
+		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		global $post;
+		$post = get_post( $post_id );
+		if ( ! $post || 'salary' !== $post->post_type ) {
+			wp_die( '指定された投稿が見つかりません。' );
+		}
+		setup_postdata( $post );
+		require plugin_dir_path( __FILE__ ) . 'template-parts/doc/frame-salary-pdf.php';
+		exit;
+	}
+);
+
+/*
+	PDF発行ボタン（公開メタボックス内）
+--------------------------------------------- */
+add_action( 'post_submitbox_start', 'bvsl_render_pdf_issue_in_submitbox', 20 );
+function bvsl_render_pdf_issue_in_submitbox( $post ) {
+	if ( 'salary' !== get_post_type( $post ) ) {
+		return;
+	}
+	$is_new = ( 'auto-draft' === $post->post_status || 0 === $post->ID );
+	?>
+	<div id="bvsl-pdf-issue-wrap" style="padding: 10px; border-top: 1px solid #dcdcde;">
+		<button
+			type="button"
+			id="bvsl-pdf-issue-btn"
+			class="button button-primary button-large"
+			<?php echo $is_new ? 'disabled' : ''; ?>
+			style="width: 100%; display: block; text-align: center;"
+		>PDF発行</button>
+		<?php if ( $is_new ) : ?>
+		<p style="margin-top:6px;color:#555;font-size:12px;">先に保存してから発行できます。</p>
+		<?php endif; ?>
+		<div style="display:flex; align-items:center; margin-top:6px;">
+			<span id="bvsl-pdf-issue-spinner" class="spinner" style="float:none; display:none; margin:0 8px 0 0;"></span>
+			<p id="bvsl-pdf-issue-message" style="margin:0; text-align:left;"></p>
+		</div>
+	</div>
+	<?php
+}
 
 /*
 	支給分アーカイブページのテンプレートを上書き

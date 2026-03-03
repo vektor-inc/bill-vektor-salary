@@ -2,7 +2,8 @@
 Contributors: kurudrive
 Donate link:
 Tags: comments, spam
-Requires at least: 4.5
+Requires at least: 6.0
+Requires PHP: 8.0
 Tested up to: 6.8
 Stable tag: 0.10.0
 License: GPLv2 or later
@@ -14,6 +15,9 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 == Changelog ==
 
+* [ 機能追加 ] 給与明細画面にPDF出力機能を追加し、PDF専用テンプレートで表示できるように変更
+* [ 仕様変更 ] PDF発行ボタンを公開パネル内の「この書類を複製」の下に移動
+* [ 修正 ] 「その他支給・控除（非課税）」テーブルのHTML構造を調整（`<thead>` を追加）
 * [ 機能追加 ] 共通メッセージを登録し、以下の3モードで使用可能にする機能を追加: (1) 個別優先（未入力時は共通を使用）、(2) 結合（共通 + 個別）、(3) 結合（個別 + 共通）
 * [ 機能追加 ] 編集画面で健康保険と厚生年金の合計を自動計算して表示する機能を追加
 * [ 機能追加 ] 投稿タイプ「給与明細」に給与種類（給与 / 賞与）の固定タクソノミーを追加（ユーザーによる項目の追加・削除・編集は不可）
