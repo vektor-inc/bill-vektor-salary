@@ -28,7 +28,22 @@ define( 'BVSL_MAIL_SEND_LOCK_OPTION_PREFIX', 'bvsl_send_lock_' );
 /**
  * メール送信ロック秒数。
  */
-define( 'BVSL_MAIL_SEND_LOCK_TTL', 30 );
+define( 'BVSL_MAIL_SEND_LOCK_TTL', 300 );
+
+/**
+ * メール履歴更新ロック option キープレフィックス。
+ */
+define( 'BVSL_MAIL_HISTORY_LOCK_OPTION_PREFIX', 'bvsl_mail_history_lock_' );
+
+/**
+ * メール履歴更新ロックの最大リトライ回数。
+ */
+define( 'BVSL_MAIL_HISTORY_LOCK_MAX_RETRY', 5 );
+
+/**
+ * メール履歴更新ロックのリトライ待機マイクロ秒。
+ */
+define( 'BVSL_MAIL_HISTORY_LOCK_RETRY_USEC', 50000 );
 
 add_action( 'wp_ajax_bvsl_preview_salary_mail', 'bvsl_ajax_preview_salary_mail' );
 add_action( 'wp_ajax_bvsl_send_salary_mail', 'bvsl_ajax_send_salary_mail' );
@@ -41,6 +56,16 @@ add_action( 'wp_ajax_bvsl_send_salary_mail', 'bvsl_ajax_send_salary_mail' );
  */
 function bvsl_get_mail_send_lock_key( $post_id ) {
 	return BVSL_MAIL_SEND_LOCK_OPTION_PREFIX . (int) $post_id;
+}
+
+/**
+ * メール履歴更新ロックキーを返す。
+ *
+ * @param int $post_id 給与明細投稿ID。
+ * @return string optionキー。
+ */
+function bvsl_get_mail_history_lock_key( $post_id ) {
+	return BVSL_MAIL_HISTORY_LOCK_OPTION_PREFIX . (int) $post_id;
 }
 
 /**
@@ -328,16 +353,38 @@ function bvsl_resolve_salary_mail_attachment_id( $post_id, $attachment_id = 0 ) 
  * @return void
  */
 function bvsl_add_salary_mail_history_record( $post_id, $record ) {
-	$history = get_post_meta( $post_id, BVSL_MAIL_HISTORY_META_KEY, true );
-	if ( ! is_array( $history ) ) {
-		$history = array();
+	$lock_key      = bvsl_get_mail_history_lock_key( $post_id );
+	$lock_acquired = false;
+
+	for ( $attempt = 0; $attempt < BVSL_MAIL_HISTORY_LOCK_MAX_RETRY; $attempt++ ) {
+		if ( add_option( $lock_key, time(), '', false ) ) {
+			$lock_acquired = true;
+			break;
+		}
+		usleep( BVSL_MAIL_HISTORY_LOCK_RETRY_USEC );
 	}
 
-	array_unshift( $history, $record );
+	if ( ! $lock_acquired ) {
+		error_log( sprintf( 'bvsl_add_salary_mail_history_record lock acquisition failed. post_id: %d', (int) $post_id ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		update_post_meta( $post_id, BVSL_LAST_MAIL_STATUS_META_KEY, $record['status'] );
+		update_post_meta( $post_id, BVSL_LAST_MAIL_SENT_AT_META_KEY, $record['sent_at'] );
+		return;
+	}
 
-	update_post_meta( $post_id, BVSL_MAIL_HISTORY_META_KEY, $history );
-	update_post_meta( $post_id, BVSL_LAST_MAIL_STATUS_META_KEY, $record['status'] );
-	update_post_meta( $post_id, BVSL_LAST_MAIL_SENT_AT_META_KEY, $record['sent_at'] );
+	try {
+		$history = get_post_meta( $post_id, BVSL_MAIL_HISTORY_META_KEY, true );
+		if ( ! is_array( $history ) ) {
+			$history = array();
+		}
+
+		array_unshift( $history, $record );
+
+		update_post_meta( $post_id, BVSL_MAIL_HISTORY_META_KEY, $history );
+		update_post_meta( $post_id, BVSL_LAST_MAIL_STATUS_META_KEY, $record['status'] );
+		update_post_meta( $post_id, BVSL_LAST_MAIL_SENT_AT_META_KEY, $record['sent_at'] );
+	} finally {
+		delete_option( $lock_key );
+	}
 }
 
 /**
