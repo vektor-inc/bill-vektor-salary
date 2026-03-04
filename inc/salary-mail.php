@@ -467,12 +467,18 @@ function bvsl_render_mail_history_table( $post_id ) {
 			</thead>
 			<tbody id="bvsl-mail-history-tbody">
 				<?php foreach ( $history as $record ) : ?>
-					<?php
-					$sent_at      = isset( $record['sent_at'] ) ? date_i18n( 'Y/m/d H:i', strtotime( $record['sent_at'] ) ) : '';
-					$to           = isset( $record['to'] ) ? (string) $record['to'] : '';
-					$subject      = isset( $record['subject'] ) ? (string) $record['subject'] : '';
-					$attach_name  = isset( $record['attachment_name'] ) ? (string) $record['attachment_name'] : '';
-					$status       = ( isset( $record['status'] ) && 'success' === $record['status'] ) ? '成功' : '失敗';
+						<?php
+						$sent_at = '';
+						if ( isset( $record['sent_at'] ) ) {
+							$sent_at_timestamp = strtotime( (string) $record['sent_at'] );
+							if ( false !== $sent_at_timestamp ) {
+								$sent_at = date_i18n( 'Y/m/d H:i', $sent_at_timestamp );
+							}
+						}
+						$to           = isset( $record['to'] ) ? (string) $record['to'] : '';
+						$subject      = isset( $record['subject'] ) ? (string) $record['subject'] : '';
+						$attach_name  = isset( $record['attachment_name'] ) ? (string) $record['attachment_name'] : '';
+						$status       = ( isset( $record['status'] ) && 'success' === $record['status'] ) ? '成功' : '失敗';
 					$error_message = isset( $record['error_message'] ) ? (string) $record['error_message'] : '';
 					?>
 					<tr>
