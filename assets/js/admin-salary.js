@@ -233,6 +233,298 @@
 }() );
 
 /**
+ * 給与明細編集画面 - メール送信プレビュー・送信
+ */
+( function () {
+	'use strict';
+
+	/**
+	 * 文字列をHTMLエスケープする。
+	 *
+	 * @param {string} str
+	 * @return {string}
+	 */
+	function escapeHtml( str ) {
+		return String( str )
+			.replace( /&/g, '&amp;' )
+			.replace( /</g, '&lt;' )
+			.replace( />/g, '&gt;' )
+			.replace( /"/g, '&quot;' );
+	}
+
+	/**
+	 * 送信日時文字列（Y-m-d H:i:s）を Y/m/d H:i 形式に変換する。
+	 *
+	 * @param {string} sentAt
+	 * @return {string}
+	 */
+	function formatSentAt( sentAt ) {
+		if ( ! sentAt ) {
+			return '';
+		}
+		return sentAt.replace( /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}).*$/, '$1/$2/$3 $4:$5' );
+	}
+
+	/**
+	 * メール履歴テーブルの tbody を取得し、なければ作成する。
+	 *
+	 * @return {Element|null}
+	 */
+	function ensureMailHistoryTable() {
+		var tbody = document.getElementById( 'bvsl-mail-history-tbody' );
+		if ( tbody ) {
+			return tbody;
+		}
+
+		var wrap = document.getElementById( 'bvsl-mail-history-wrap' );
+		if ( ! wrap ) {
+			var metaBox = document.getElementById( 'meta_box_bill_normal' );
+			if ( ! metaBox ) {
+				return null;
+			}
+			var insideEl = metaBox.querySelector( '.inside' ) || metaBox;
+
+			wrap = document.createElement( 'div' );
+			wrap.id = 'bvsl-mail-history-wrap';
+			wrap.style.marginTop = '16px';
+			wrap.innerHTML =
+				'<h4 style="margin-bottom:6px;">メール送信履歴</h4>' +
+				'<table class="widefat striped">' +
+					'<thead><tr>' +
+						'<th>送信日時</th>' +
+						'<th>送信先</th>' +
+						'<th>件名</th>' +
+						'<th>添付PDF</th>' +
+						'<th>結果</th>' +
+						'<th>失敗理由</th>' +
+					'</tr></thead>' +
+					'<tbody id="bvsl-mail-history-tbody"></tbody>' +
+				'</table>';
+			insideEl.appendChild( wrap );
+		}
+
+		return document.getElementById( 'bvsl-mail-history-tbody' );
+	}
+
+	/**
+	 * メール履歴テーブルに1行追加する。
+	 *
+	 * @param {Object} data 送信結果データ
+	 * @return {void}
+	 */
+	function prependMailHistoryRow( data ) {
+		var tbody = ensureMailHistoryTable();
+		if ( ! tbody ) {
+			return;
+		}
+
+		var tr = document.createElement( 'tr' );
+		tr.innerHTML =
+			'<td>' + escapeHtml( formatSentAt( data.sent_at ) ) + '</td>' +
+			'<td>' + escapeHtml( data.to || '' ) + '</td>' +
+			'<td>' + escapeHtml( data.subject || '' ) + '</td>' +
+			'<td>' + escapeHtml( data.attachment_name || '' ) + '</td>' +
+			'<td>成功</td>' +
+			'<td></td>';
+
+		tbody.insertBefore( tr, tbody.firstChild );
+	}
+
+	/**
+	 * 送信プレビューモーダルDOMを返す。なければ作成する。
+	 *
+	 * @return {Object}
+	 */
+	function ensurePreviewModal() {
+		var overlay = document.getElementById( 'bvsl-mail-preview-modal' );
+		if ( ! overlay ) {
+			overlay = document.createElement( 'div' );
+			overlay.id = 'bvsl-mail-preview-modal';
+			overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;z-index:100000;';
+			overlay.innerHTML =
+				'<div style="max-width:800px;width:calc(100% - 40px);margin:40px auto;background:#fff;border-radius:4px;padding:16px;max-height:calc(100vh - 80px);overflow:auto;">' +
+					'<h2 style="margin-top:0;">メール送信プレビュー</h2>' +
+					'<p style="margin:0 0 8px;"><strong>件名</strong></p>' +
+					'<div id="bvsl-mail-preview-subject" style="border:1px solid #dcdcde;padding:8px;background:#fff;margin-bottom:12px;"></div>' +
+					'<p style="margin:0 0 8px;"><strong>本文</strong></p>' +
+					'<pre id="bvsl-mail-preview-body" style="border:1px solid #dcdcde;padding:8px;background:#fff;white-space:pre-wrap;word-break:break-word;min-height:180px;"></pre>' +
+					'<p style="margin:12px 0 8px;">この内容でメールを送信しますか</p>' +
+					'<div style="display:flex;gap:8px;align-items:center;">' +
+						'<button type="button" id="bvsl-mail-send-confirm-btn" class="button button-primary">メールを送信する</button>' +
+						'<button type="button" id="bvsl-mail-send-cancel-btn" class="button">キャンセル</button>' +
+						'<span id="bvsl-mail-send-confirm-spinner" class="spinner" style="float:none;display:none;margin:0;"></span>' +
+					'</div>' +
+				'</div>';
+			document.body.appendChild( overlay );
+		}
+
+		return {
+			overlay: overlay,
+			subject: document.getElementById( 'bvsl-mail-preview-subject' ),
+			body: document.getElementById( 'bvsl-mail-preview-body' ),
+			confirmBtn: document.getElementById( 'bvsl-mail-send-confirm-btn' ),
+			cancelBtn: document.getElementById( 'bvsl-mail-send-cancel-btn' ),
+			confirmSpinner: document.getElementById( 'bvsl-mail-send-confirm-spinner' ),
+		};
+	}
+
+	/**
+	 * 送信メッセージ表示を更新する。
+	 *
+	 * @param {string} text テキスト
+	 * @param {string} color 色
+	 * @return {void}
+	 */
+	function setSendMessage( text, color ) {
+		var message = document.getElementById( 'bvsl-mail-send-message' );
+		if ( ! message ) {
+			return;
+		}
+		message.style.color = color;
+		message.textContent = text;
+	}
+
+	/**
+	 * プレビュー取得リクエストを送る。
+	 *
+	 * @return {Promise}
+	 */
+	function fetchPreview() {
+		var formData = new window.FormData();
+		formData.append( 'action', 'bvsl_preview_salary_mail' );
+		formData.append( 'nonce', window.bvslAdminSalary.mailNonce );
+		formData.append( 'post_id', window.bvslAdminSalary.postId );
+
+		return window.fetch( window.bvslAdminSalary.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: formData,
+		} ).then( function ( res ) {
+			return res.json();
+		} );
+	}
+
+	/**
+	 * メール送信リクエストを送る。
+	 *
+	 * @param {string} subject 件名
+	 * @return {Promise}
+	 */
+	function sendMail( subject ) {
+		var formData = new window.FormData();
+		formData.append( 'action', 'bvsl_send_salary_mail' );
+		formData.append( 'nonce', window.bvslAdminSalary.mailNonce );
+		formData.append( 'post_id', window.bvslAdminSalary.postId );
+		formData.append( 'subject', subject );
+
+		return window.fetch( window.bvslAdminSalary.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: formData,
+		} ).then( function ( res ) {
+			return res.json();
+		} );
+	}
+
+	/**
+	 * 送信プレビューの初期化。
+	 *
+	 * @return {void}
+	 */
+	function initMailPreview() {
+		var previewBtn = document.getElementById( 'bvsl-mail-preview-btn' );
+		var spinner    = document.getElementById( 'bvsl-mail-send-spinner' );
+
+		if ( ! previewBtn || ! window.bvslAdminSalary || ! window.bvslAdminSalary.mailNonce ) {
+			return;
+		}
+
+		var modal = ensurePreviewModal();
+		var latestPreview = null;
+
+		previewBtn.addEventListener( 'click', function () {
+			previewBtn.disabled = true;
+			if ( spinner ) {
+				spinner.style.display = 'inline-block';
+			}
+			setSendMessage( '', '#333' );
+
+			fetchPreview()
+				.then( function ( json ) {
+					if ( json && json.success && json.data ) {
+						latestPreview = json.data;
+						modal.subject.textContent = json.data.subject || '';
+						modal.body.textContent = json.data.body || '';
+						modal.overlay.style.display = 'block';
+						return;
+					}
+
+					var errorMessage = ( json && json.data && json.data.message ) ? json.data.message : 'メールプレビューの取得に失敗しました。';
+					setSendMessage( errorMessage, '#dc3232' );
+				} )
+				.catch( function () {
+					setSendMessage( '通信エラーが発生しました。', '#dc3232' );
+				} )
+				.finally( function () {
+					previewBtn.disabled = false;
+					if ( spinner ) {
+						spinner.style.display = 'none';
+					}
+				} );
+		} );
+
+		modal.cancelBtn.addEventListener( 'click', function () {
+			modal.overlay.style.display = 'none';
+		} );
+
+		modal.overlay.addEventListener( 'click', function ( event ) {
+			if ( event.target === modal.overlay ) {
+				modal.overlay.style.display = 'none';
+			}
+		} );
+
+		modal.confirmBtn.addEventListener( 'click', function () {
+			if ( ! latestPreview ) {
+				return;
+			}
+
+			modal.confirmBtn.disabled = true;
+			if ( modal.confirmSpinner ) {
+				modal.confirmSpinner.style.display = 'inline-block';
+			}
+
+			sendMail( latestPreview.subject || '' )
+				.then( function ( json ) {
+					if ( json && json.success && json.data ) {
+						prependMailHistoryRow( json.data );
+						setSendMessage( 'メールを送信しました。', '#46b450' );
+						modal.overlay.style.display = 'none';
+						return;
+					}
+
+					var errorMessage = ( json && json.data && json.data.message ) ? json.data.message : 'メール送信に失敗しました。';
+					setSendMessage( errorMessage, '#dc3232' );
+				} )
+				.catch( function () {
+					setSendMessage( '通信エラーが発生しました。', '#dc3232' );
+				} )
+				.finally( function () {
+					modal.confirmBtn.disabled = false;
+					if ( modal.confirmSpinner ) {
+						modal.confirmSpinner.style.display = 'none';
+					}
+				} );
+		} );
+	}
+
+	if ( document.readyState === 'loading' ) {
+		document.addEventListener( 'DOMContentLoaded', initMailPreview );
+	} else {
+		initMailPreview();
+	}
+}() );
+
+/**
  * 給与明細編集画面 - 支給分の共通メッセージ表示
  */
 ( function () {
