@@ -21,9 +21,9 @@ define( 'BVSL_LAST_MAIL_STATUS_META_KEY', 'bvsl_last_mail_status' );
 define( 'BVSL_LAST_MAIL_SENT_AT_META_KEY', 'bvsl_last_mail_sent_at' );
 
 /**
- * メール送信ロック transient キープレフィックス。
+ * メール送信ロック option キープレフィックス。
  */
-define( 'BVSL_MAIL_SEND_LOCK_TRANSIENT_PREFIX', 'bvsl_send_lock_' );
+define( 'BVSL_MAIL_SEND_LOCK_OPTION_PREFIX', 'bvsl_send_lock_' );
 
 /**
  * メール送信ロック秒数。
@@ -37,32 +37,39 @@ add_action( 'wp_ajax_bvsl_send_salary_mail', 'bvsl_ajax_send_salary_mail' );
  * メール送信ロックキーを返す。
  *
  * @param int $post_id 給与明細投稿ID。
- * @return string transientキー。
+ * @return string optionキー。
  */
 function bvsl_get_mail_send_lock_key( $post_id ) {
-	return BVSL_MAIL_SEND_LOCK_TRANSIENT_PREFIX . (int) $post_id;
+	return BVSL_MAIL_SEND_LOCK_OPTION_PREFIX . (int) $post_id;
 }
 
 /**
- * メール送信ロック中か判定する。
+ * メール送信ロックを原子的に取得する。
  *
  * @param int $post_id 給与明細投稿ID。
- * @return bool ロック中の場合はtrue。
- */
-function bvsl_is_mail_send_locked( $post_id ) {
-	$lock_key = bvsl_get_mail_send_lock_key( $post_id );
-	return false !== get_transient( $lock_key );
-}
-
-/**
- * メール送信ロックを設定する。
- *
- * @param int $post_id 給与明細投稿ID。
- * @return void
+ * @return bool 取得できた場合はtrue。
  */
 function bvsl_set_mail_send_lock( $post_id ) {
 	$lock_key = bvsl_get_mail_send_lock_key( $post_id );
-	set_transient( $lock_key, 1, BVSL_MAIL_SEND_LOCK_TTL );
+	$now      = time();
+	$lock     = array(
+		'expires_at' => $now + BVSL_MAIL_SEND_LOCK_TTL,
+	);
+
+	// add_option は同一キー重複時に false を返すため、ロック取得を原子的に扱える。
+	if ( add_option( $lock_key, $lock, '', false ) ) {
+		return true;
+	}
+
+	$existing_lock = get_option( $lock_key );
+	if ( is_array( $existing_lock ) && isset( $existing_lock['expires_at'] ) && (int) $existing_lock['expires_at'] <= $now ) {
+		delete_option( $lock_key );
+		if ( add_option( $lock_key, $lock, '', false ) ) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 /**
@@ -73,7 +80,7 @@ function bvsl_set_mail_send_lock( $post_id ) {
  */
 function bvsl_clear_mail_send_lock( $post_id ) {
 	$lock_key = bvsl_get_mail_send_lock_key( $post_id );
-	delete_transient( $lock_key );
+	delete_option( $lock_key );
 }
 
 /**
@@ -334,6 +341,32 @@ function bvsl_add_salary_mail_history_record( $post_id, $record ) {
 }
 
 /**
+ * メール送信日時の保存値を返す。
+ *
+ * サイトタイムゾーンで保存し、表示時も同じタイムゾーンで解釈する。
+ *
+ * @return string Y-m-d H:i:s 形式。
+ */
+function bvsl_get_mail_sent_at_for_storage() {
+	return wp_date( 'Y-m-d H:i:s', null, wp_timezone() );
+}
+
+/**
+ * メール送信日時の保存値を表示用フォーマットへ変換する。
+ *
+ * @param string $sent_at_raw 保存値（Y-m-d H:i:s）。
+ * @return string 表示文字列。パース失敗時は空文字。
+ */
+function bvsl_format_mail_sent_at_for_display( $sent_at_raw ) {
+	$datetime = date_create_from_format( 'Y-m-d H:i:s', (string) $sent_at_raw, wp_timezone() );
+	if ( false === $datetime ) {
+		return '';
+	}
+
+	return wp_date( 'Y/m/d H:i', $datetime->getTimestamp(), wp_timezone() );
+}
+
+/**
  * メール送信失敗履歴を投稿メタへ保存する。
  *
  * @param int    $post_id          給与明細投稿ID。
@@ -346,7 +379,7 @@ function bvsl_add_salary_mail_history_record( $post_id, $record ) {
  */
 function bvsl_add_salary_mail_failure_history_record( $post_id, $to, $subject, $attachment_id, $attachment_name, $error_message ) {
 	$record = array(
-		'sent_at'         => current_time( 'Y-m-d H:i:s' ),
+		'sent_at'         => bvsl_get_mail_sent_at_for_storage(),
 		'status'          => 'failed',
 		'to'              => (string) $to,
 		'subject'         => (string) $subject,
@@ -390,13 +423,11 @@ function bvsl_send_salary_mail( $post_id, $args = array() ) {
 
 	$requested_attachment_id = isset( $args['attachment_id'] ) ? (int) $args['attachment_id'] : 0;
 
-	if ( bvsl_is_mail_send_locked( $post_id ) ) {
+	if ( ! bvsl_set_mail_send_lock( $post_id ) ) {
 		$error = new WP_Error( 'mail_send_locked', '短時間に連続送信はできません。しばらく待ってから再実行してください。' );
 		bvsl_add_salary_mail_failure_history_record( $post_id, $to, $subject, $requested_attachment_id, '', $error->get_error_message() );
 		return $error;
 	}
-
-	bvsl_set_mail_send_lock( $post_id );
 
 	$message = bvsl_build_salary_mail_body( $post_id );
 
@@ -416,7 +447,7 @@ function bvsl_send_salary_mail( $post_id, $args = array() ) {
 	}
 
 	$headers = array();
-	$sent_at = current_time( 'Y-m-d H:i:s' );
+	$sent_at = bvsl_get_mail_sent_at_for_storage();
 
 	$record = array(
 		'sent_at'         => $sent_at,
@@ -459,7 +490,7 @@ function bvsl_ajax_preview_salary_mail() {
 	check_ajax_referer( 'bvsl_send_salary_mail_nonce', 'nonce' );
 
 	$post_id = isset( $_POST['post_id'] ) ? (int) $_POST['post_id'] : 0;
-	if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
+	if ( ! $post_id || 'salary' !== get_post_type( $post_id ) || ! current_user_can( 'edit_post', $post_id ) ) {
 		wp_send_json_error( array( 'message' => '権限がありません。' ), 403 );
 	}
 
@@ -532,21 +563,18 @@ function bvsl_render_mail_history_table( $post_id ) {
 				</tr>
 			</thead>
 			<tbody id="bvsl-mail-history-tbody">
-				<?php foreach ( $history as $record ) : ?>
+					<?php foreach ( $history as $record ) : ?>
 						<?php
 						$sent_at = '';
 						if ( isset( $record['sent_at'] ) ) {
-							$sent_at_timestamp = strtotime( (string) $record['sent_at'] );
-							if ( false !== $sent_at_timestamp ) {
-								$sent_at = date_i18n( 'Y/m/d H:i', $sent_at_timestamp );
-							}
+							$sent_at = bvsl_format_mail_sent_at_for_display( (string) $record['sent_at'] );
 						}
-						$to           = isset( $record['to'] ) ? (string) $record['to'] : '';
-						$subject      = isset( $record['subject'] ) ? (string) $record['subject'] : '';
-						$attach_name  = isset( $record['attachment_name'] ) ? (string) $record['attachment_name'] : '';
-						$status       = ( isset( $record['status'] ) && 'success' === $record['status'] ) ? '成功' : '失敗';
-							$error_message = isset( $record['error_message'] ) ? (string) $record['error_message'] : '';
-					?>
+						$to            = isset( $record['to'] ) ? (string) $record['to'] : '';
+						$subject       = isset( $record['subject'] ) ? (string) $record['subject'] : '';
+						$attach_name   = isset( $record['attachment_name'] ) ? (string) $record['attachment_name'] : '';
+						$status        = ( isset( $record['status'] ) && 'success' === $record['status'] ) ? '成功' : '失敗';
+						$error_message = isset( $record['error_message'] ) ? (string) $record['error_message'] : '';
+						?>
 					<tr>
 						<td><?php echo esc_html( $sent_at ); ?></td>
 						<td><?php echo esc_html( $to ); ?></td>
