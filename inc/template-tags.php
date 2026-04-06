@@ -151,7 +151,7 @@ function bvsl_get_business_type() {
 	}
 
 	// 2. スタッフの設定を確認する。
-	$staff_id = isset( $post->salary_staff ) ? (int) $post->salary_staff : 0;
+	$staff_id = isset( $post->ID ) ? (int) get_post_meta( $post->ID, 'salary_staff', true ) : 0;
 	if ( $staff_id ) {
 		$staff_type = get_post_meta( $staff_id, 'salary_business_type', true );
 		if ( in_array( $staff_type, $valid_types, true ) ) {

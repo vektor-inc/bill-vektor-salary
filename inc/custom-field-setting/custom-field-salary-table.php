@@ -239,6 +239,7 @@ class Salary_Table_Custom_Fields {
 					'construction' => '建設の事業',
 				),
 				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
 			),
 			'salary_target_term'          => array(
 				'label'       => '給与対象時期',
