@@ -89,6 +89,7 @@ function bvsl_admin_enqueue_scripts( $hook ) {
 				'post_type'      => 'staff',
 				'posts_per_page' => -1,
 				'fields'         => 'ids',
+				'no_found_rows'  => true,
 			)
 		);
 		foreach ( $staff_posts as $staff_id ) {
@@ -135,6 +136,8 @@ function bvsl_invalidate_staff_defaults_cache( $post_id ) {
 }
 add_action( 'save_post', 'bvsl_invalidate_staff_defaults_cache' );
 add_action( 'delete_post', 'bvsl_invalidate_staff_defaults_cache' );
+add_action( 'trashed_post', 'bvsl_invalidate_staff_defaults_cache' );
+add_action( 'untrashed_post', 'bvsl_invalidate_staff_defaults_cache' );
 
 require_once 'inc/duplicate-doc.php';
 require_once 'inc/staff/staff.php';
