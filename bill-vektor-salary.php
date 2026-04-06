@@ -72,33 +72,38 @@ function bvsl_admin_enqueue_scripts( $hook ) {
 
 	// スタッフごとのメタデータマッピングを構築する。
 	// スタッフ選択時の自動反映と事業種類の判定に使用する。
-	$staff_defaults     = array();
-	$staff_meta_keys    = array(
-		'salary_staff_number',
-		'salary_fuyou',
-		'salary_base',
-		'salary_transportation_total',
-		'salary_koyouhoken',
-		'salary_business_type',
-	);
-	$staff_posts        = get_posts(
-		array(
-			'post_type'      => 'staff',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-		)
-	);
-	foreach ( $staff_posts as $staff_id ) {
-		$meta = array();
-		foreach ( $staff_meta_keys as $key ) {
-			$value = get_post_meta( $staff_id, $key, true );
-			if ( '' !== $value && false !== $value ) {
-				$meta[ $key ] = $value;
+	// transient キャッシュで毎回のDBクエリを回避する。
+	$staff_defaults = get_transient( 'bvsl_staff_defaults' );
+	if ( false === $staff_defaults ) {
+		$staff_defaults  = array();
+		$staff_meta_keys = array(
+			'salary_staff_number',
+			'salary_fuyou',
+			'salary_base',
+			'salary_transportation_total',
+			'salary_koyouhoken',
+			'salary_business_type',
+		);
+		$staff_posts     = get_posts(
+			array(
+				'post_type'      => 'staff',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+			)
+		);
+		foreach ( $staff_posts as $staff_id ) {
+			$meta = array();
+			foreach ( $staff_meta_keys as $key ) {
+				$value = get_post_meta( $staff_id, $key, true );
+				if ( '' !== $value && false !== $value ) {
+					$meta[ $key ] = $value;
+				}
+			}
+			if ( ! empty( $meta ) ) {
+				$staff_defaults[ (string) $staff_id ] = $meta;
 			}
 		}
-		if ( ! empty( $meta ) ) {
-			$staff_defaults[ (string) $staff_id ] = $meta;
-		}
+		set_transient( 'bvsl_staff_defaults', $staff_defaults, HOUR_IN_SECONDS );
 	}
 
 	wp_localize_script(
@@ -117,6 +122,19 @@ function bvsl_admin_enqueue_scripts( $hook ) {
 		)
 	);
 }
+
+/**
+ * スタッフ投稿の保存・削除時にスタッフデフォルトキャッシュを無効化する。
+ *
+ * @param int $post_id 投稿ID。
+ */
+function bvsl_invalidate_staff_defaults_cache( $post_id ) {
+	if ( 'staff' === get_post_type( $post_id ) ) {
+		delete_transient( 'bvsl_staff_defaults' );
+	}
+}
+add_action( 'save_post', 'bvsl_invalidate_staff_defaults_cache' );
+add_action( 'delete_post', 'bvsl_invalidate_staff_defaults_cache' );
 
 require_once 'inc/duplicate-doc.php';
 require_once 'inc/staff/staff.php';
