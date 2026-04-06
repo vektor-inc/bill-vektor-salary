@@ -97,22 +97,96 @@ function bvsl_get_hikazei_additional_total() {
 }
 
 /**
+ * 雇用保険料率テーブル
+ *
+ * 事業の種類と給与対象時期に基づく労働者負担の雇用保険料率を返す。
+ * 料率は 事業の種類 => 給与対象時期 => 料率 の形式で定義。
+ *
+ * @return array 料率テーブル
+ */
+function bvsl_get_koyou_hoken_rate_table() {
+	return array(
+		'general'      => array(
+			'20260401_after'  => 5 / 1000,
+			'20250401_after'  => 5.5 / 1000,
+			'20230401_after'  => 6 / 1000,
+			'20221001_after'  => 5 / 1000,
+			'20220930_before' => 3 / 1000,
+		),
+		'agriculture'  => array(
+			'20260401_after'  => 6 / 1000,
+			'20250401_after'  => 6.5 / 1000,
+			'20230401_after'  => 7 / 1000,
+			'20221001_after'  => 6 / 1000,
+			'20220930_before' => 4 / 1000,
+		),
+		'construction' => array(
+			'20260401_after'  => 6 / 1000,
+			'20250401_after'  => 6.5 / 1000,
+			'20230401_after'  => 7 / 1000,
+			'20221001_after'  => 6 / 1000,
+			'20220930_before' => 4 / 1000,
+		),
+	);
+}
+
+/**
+ * 事業の種類を取得する
+ *
+ * 優先度: 給与明細 > スタッフ > グローバル設定。
+ * いずれも未設定の場合は 'general'（一般の事業）を返す。
+ *
+ * @return string 事業の種類（general / agriculture / construction）
+ */
+function bvsl_get_business_type() {
+	global $post;
+	$valid_types = array( 'general', 'agriculture', 'construction' );
+
+	// 1. 給与明細の設定を確認する。
+	if ( isset( $post->ID ) ) {
+		$salary_type = get_post_meta( $post->ID, 'salary_business_type', true );
+		if ( in_array( $salary_type, $valid_types, true ) ) {
+			return $salary_type;
+		}
+	}
+
+	// 2. スタッフの設定を確認する。
+	$staff_id = isset( $post->salary_staff ) ? (int) $post->salary_staff : 0;
+	if ( $staff_id ) {
+		$staff_type = get_post_meta( $staff_id, 'salary_business_type', true );
+		if ( in_array( $staff_type, $valid_types, true ) ) {
+			return $staff_type;
+		}
+	}
+
+	// 3. グローバル設定を確認する。
+	$global_type = get_option( 'bvsl_business_type', 'general' );
+	if ( in_array( $global_type, $valid_types, true ) ) {
+		return $global_type;
+	}
+
+	return 'general';
+}
+
+/**
  * 雇用保険料の料率
  *
- * @return float [description]
+ * 給与対象時期とスタッフの事業の種類に基づいて料率を返す。
+ *
+ * @return float 雇用保険料率
  */
 function bvsl_get_koyou_hoken_rate() {
 	global $post;
-	if ( '20250401_after' === $post->salary_target_term ) {
-		$rate = 5.5 / 1000;
-	} elseif ( '20230401_after' === $post->salary_target_term ) {
-		$rate = 6 / 1000;
-	} elseif ( '20221001_after' === $post->salary_target_term ) {
-		$rate = 5 / 1000;
-	} else {
-		$rate = 3 / 1000;
+	$business_type = bvsl_get_business_type();
+	$term          = isset( $post->salary_target_term ) ? $post->salary_target_term : '20220930_before';
+	$table         = bvsl_get_koyou_hoken_rate_table();
+
+	if ( isset( $table[ $business_type ][ $term ] ) ) {
+		return $table[ $business_type ][ $term ];
 	}
-	return $rate;
+
+	// 未知の時期の場合はデフォルト（一般・〜令和4年9月）を返す。
+	return 3 / 1000;
 }
 
 /**

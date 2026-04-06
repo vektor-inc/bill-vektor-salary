@@ -93,6 +93,29 @@ class SalaryTest extends WP_UnitTestCase {
 				),
 				'correct'   => 0.006,
 			),
+			array(
+				'post'      => array(
+					'post_title'   => 'Salary Title',
+					'post_content' => 'test',
+					'post_type'    => 'salary',
+				),
+				'post_meta' => array(
+					'salary_target_term' => '20250401_after',
+				),
+				'correct'   => 0.0055,
+			),
+			array(
+				'post'      => array(
+					'post_title'   => 'Salary Title',
+					'post_content' => 'test',
+					'post_type'    => 'salary',
+				),
+				'post_meta' => array(
+					'salary_target_term' => '20260401_after',
+				),
+				// 令和8年4月1日〜 一般の事業 労働者負担 5/1,000
+				'correct'   => 0.005,
+			),
 		);
 		// var_dump $this->$test_data;
 		foreach ( $test_data as $test_value ) {
@@ -115,6 +138,173 @@ class SalaryTest extends WP_UnitTestCase {
 			wp_delete_post( $post_id, true );
 			$post_id = 0;
 		}
+	}
+
+	/**
+	 * 事業の種類ごとの雇用保険料率テスト
+	 *
+	 * スタッフに事業の種類を設定した場合の料率が正しいことを確認する。
+	 */
+	public function test_bvsl_get_koyou_hoken_rate_by_business_type() {
+		print PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+		print 'test_bvsl_get_koyou_hoken_rate_by_business_type' . PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+
+		$test_data = array(
+			// 農林水産・清酒製造の事業
+			array(
+				'business_type' => 'agriculture',
+				'term'          => '20260401_after',
+				'correct'       => 0.006,
+			),
+			array(
+				'business_type' => 'agriculture',
+				'term'          => '20250401_after',
+				'correct'       => 0.0065,
+			),
+			array(
+				'business_type' => 'agriculture',
+				'term'          => '20230401_after',
+				'correct'       => 0.007,
+			),
+			array(
+				'business_type' => 'agriculture',
+				'term'          => '20221001_after',
+				'correct'       => 0.006,
+			),
+			array(
+				'business_type' => 'agriculture',
+				'term'          => '20220930_before',
+				'correct'       => 0.004,
+			),
+			// 建設の事業
+			array(
+				'business_type' => 'construction',
+				'term'          => '20260401_after',
+				'correct'       => 0.006,
+			),
+			array(
+				'business_type' => 'construction',
+				'term'          => '20250401_after',
+				'correct'       => 0.0065,
+			),
+			array(
+				'business_type' => 'construction',
+				'term'          => '20230401_after',
+				'correct'       => 0.007,
+			),
+			// 一般の事業（明示的に指定した場合）
+			array(
+				'business_type' => 'general',
+				'term'          => '20260401_after',
+				'correct'       => 0.005,
+			),
+		);
+
+		foreach ( $test_data as $test_value ) {
+			// スタッフ投稿を作成し、事業の種類を設定する。
+			$staff_id = wp_insert_post(
+				array(
+					'post_title' => 'Test Staff',
+					'post_type'  => 'staff',
+				)
+			);
+			update_post_meta( $staff_id, 'salary_business_type', $test_value['business_type'] );
+
+			// 給与明細投稿を作成し、スタッフと対象時期を設定する。
+			$salary_id = wp_insert_post(
+				array(
+					'post_title'   => 'Salary Title',
+					'post_content' => 'test',
+					'post_type'    => 'salary',
+				)
+			);
+			update_post_meta( $salary_id, 'salary_staff', $staff_id );
+			update_post_meta( $salary_id, 'salary_target_term', $test_value['term'] );
+
+			global $post;
+			$post = get_post( $salary_id );
+			setup_postdata( $post );
+
+			$actual = bvsl_get_koyou_hoken_rate();
+			print PHP_EOL;
+			print 'business_type: ' . $test_value['business_type'] . ' / term: ' . $test_value['term'] . PHP_EOL;
+			print 'return  :' . $actual . PHP_EOL;
+			print 'correct :' . $test_value['correct'] . PHP_EOL;
+			$this->assertEquals( $test_value['correct'], $actual );
+
+			// テストデータをクリーンアップする。
+			wp_delete_post( $salary_id, true );
+			wp_delete_post( $staff_id, true );
+		}
+	}
+
+	/**
+	 * 事業の種類の優先度テスト
+	 *
+	 * 給与明細 > スタッフ > グローバルの優先度で適用されることを確認する。
+	 */
+	public function test_bvsl_get_business_type_priority() {
+		print PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+		print 'test_bvsl_get_business_type_priority' . PHP_EOL;
+		print '------------------------------------' . PHP_EOL;
+
+		// スタッフを作成し、農林水産を設定する。
+		$staff_id = wp_insert_post(
+			array(
+				'post_title' => 'Test Staff Priority',
+				'post_type'  => 'staff',
+			)
+		);
+		update_post_meta( $staff_id, 'salary_business_type', 'agriculture' );
+
+		// 給与明細を作成し、スタッフと対象時期を設定する。
+		$salary_id = wp_insert_post(
+			array(
+				'post_title'   => 'Salary Priority Test',
+				'post_content' => 'test',
+				'post_type'    => 'salary',
+			)
+		);
+		update_post_meta( $salary_id, 'salary_staff', $staff_id );
+		update_post_meta( $salary_id, 'salary_target_term', '20260401_after' );
+
+		global $post;
+
+		// グローバル設定を建設にする。
+		update_option( 'bvsl_business_type', 'construction' );
+
+		// 明細未設定の場合、スタッフの設定（agriculture）が優先される。
+		$post = get_post( $salary_id );
+		setup_postdata( $post );
+		$actual = bvsl_get_business_type();
+		print PHP_EOL;
+		print 'スタッフ=agriculture, グローバル=construction => ' . $actual . PHP_EOL;
+		$this->assertEquals( 'agriculture', $actual );
+
+		// 明細に建設を設定した場合、明細の設定が最優先される。
+		update_post_meta( $salary_id, 'salary_business_type', 'construction' );
+		$post = get_post( $salary_id );
+		setup_postdata( $post );
+		$actual = bvsl_get_business_type();
+		print 'スタッフ=agriculture, 明細=construction => ' . $actual . PHP_EOL;
+		$this->assertEquals( 'construction', $actual );
+
+		// 明細・スタッフともに未設定の場合、グローバル設定が適用される。
+		delete_post_meta( $salary_id, 'salary_business_type' );
+		delete_post_meta( $staff_id, 'salary_business_type' );
+		$post = get_post( $salary_id );
+		setup_postdata( $post );
+		$actual = bvsl_get_business_type();
+		print '全て未設定（グローバル=construction）=> ' . $actual . PHP_EOL;
+		$this->assertEquals( 'construction', $actual );
+
+		// クリーンアップ。
+		delete_option( 'bvsl_business_type' );
+		wp_delete_post( $salary_id, true );
+		wp_delete_post( $staff_id, true );
 	}
 
 	function test_bvsl_format_print() {
@@ -225,6 +415,17 @@ class SalaryTest extends WP_UnitTestCase {
 				),
 				// 300000 * ( 5.5 / 1000 ) + 10000 = 11650
 				'expected'  => 11650,
+			),
+			array(
+				'post'      => $dummy_post,
+				'post_meta' => array(
+					'salary_base'        => '300000',
+					'salary_target_term' => '20260401_after',
+					'salary_jyuuminzei'  => null,
+					'salary_syotokuzei'  => 10000,
+				),
+				// 300000 * ( 5 / 1000 ) + 10000 = 11500
+				'expected'  => 11500,
 			),
 			array(
 				'post'      => $dummy_post,

@@ -70,17 +70,50 @@ function bvsl_admin_enqueue_scripts( $hook ) {
 		true
 	);
 
+	// スタッフごとのメタデータマッピングを構築する。
+	// スタッフ選択時の自動反映と事業種類の判定に使用する。
+	$staff_defaults     = array();
+	$staff_meta_keys    = array(
+		'salary_staff_number',
+		'salary_fuyou',
+		'salary_base',
+		'salary_transportation_total',
+		'salary_koyouhoken',
+		'salary_business_type',
+	);
+	$staff_posts        = get_posts(
+		array(
+			'post_type'      => 'staff',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+		)
+	);
+	foreach ( $staff_posts as $staff_id ) {
+		$meta = array();
+		foreach ( $staff_meta_keys as $key ) {
+			$value = get_post_meta( $staff_id, $key, true );
+			if ( '' !== $value && false !== $value ) {
+				$meta[ $key ] = $value;
+			}
+		}
+		if ( ! empty( $meta ) ) {
+			$staff_defaults[ (string) $staff_id ] = $meta;
+		}
+	}
+
 	wp_localize_script(
 		'bvsl-admin-salary',
 		'bvslAdminSalary',
 		array(
-			'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
-			'nonce'           => wp_create_nonce( 'bvsl_salary_admin_nonce' ),
-			'pdfNonce'        => wp_create_nonce( 'bvsl_generate_salary_pdf_nonce' ),
-			'mailNonce'       => wp_create_nonce( 'bvsl_send_salary_mail_nonce' ),
-			'commonMessageId' => 'bvsl-common-message-row',
-			'termMessages'    => $term_messages,
-			'postId'          => $post_id,
+			'ajaxUrl'            => admin_url( 'admin-ajax.php' ),
+			'nonce'              => wp_create_nonce( 'bvsl_salary_admin_nonce' ),
+			'pdfNonce'           => wp_create_nonce( 'bvsl_generate_salary_pdf_nonce' ),
+			'mailNonce'          => wp_create_nonce( 'bvsl_send_salary_mail_nonce' ),
+			'commonMessageId'    => 'bvsl-common-message-row',
+			'termMessages'       => $term_messages,
+			'postId'             => $post_id,
+			'staffDefaults'      => (object) $staff_defaults,
+			'globalBusinessType' => get_option( 'bvsl_business_type', 'general' ),
 		)
 	);
 }
@@ -91,6 +124,7 @@ require_once 'inc/template-tags.php';
 require_once 'inc/salary-message.php';
 require_once 'inc/salary-pdf.php';
 require_once 'inc/salary-mail.php';
+require_once 'inc/settings.php';
 require_once 'inc/custom-field-setting/custom-field-salary-normal.php';
 require_once 'inc/custom-field-setting/custom-field-salary-table.php';
 require_once 'inc/custom-field-setting/custom-field-staff.php';
