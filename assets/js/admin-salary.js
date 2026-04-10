@@ -214,9 +214,12 @@
 
 		// 課税対象額 = 課税支給合計 - 社会保険料合計
 		// PHP の bvsl_get_kazeisyotoku() に対応
+		// 課税支給合計 = bvsl_get_total_earn()（交通費を含まない）
 		// 0未満の場合は0とする
 		if ( kazeisyotokuDisplay ) {
-			var kazeisyotoku = getKoyouHokenTaisyou() - total;
+			// getKoyouHokenTaisyou() には交通費が含まれるため、交通費を差し引く
+			var kazeiShikyuuTotal = getKoyouHokenTaisyou() - parseAmount( getVal( 'salary_transportation_total' ) );
+			var kazeisyotoku = kazeiShikyuuTotal - total;
 			if ( kazeisyotoku < 0 ) {
 				kazeisyotoku = 0;
 			}
