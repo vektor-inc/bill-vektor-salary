@@ -66,6 +66,7 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 
 		// 投稿が正常に公開されたことを確認する。
 		await expect( page.locator( '#message' ) ).toBeVisible();
+		await expect( page.locator( '#message' ) ).toContainText( '投稿を公開しました' );
 
 		// スクリーンショット: スタッフ保存後。
 		await page.screenshot( { path: 'tests/e2e/screenshots/04-staff-saved.png', fullPage: true } );
