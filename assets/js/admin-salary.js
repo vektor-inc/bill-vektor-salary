@@ -1,13 +1,14 @@
 /**
- * 給与明細編集画面 - 雇用保険・社会保険料合計のリアルタイム表示
+ * 給与明細編集画面 - 雇用保険・社会保険料合計・課税対象額のリアルタイム表示
  *
- * PHP の bvsl_get_koyou_hoken() / bvsl_get_shakai_hoken_total() と
- * 同じ計算式を JavaScript で再現し、以下の2行をDOMに挿入する。
+ * PHP の bvsl_get_koyou_hoken() / bvsl_get_shakai_hoken_total() / bvsl_get_kazeisyotoku() と
+ * 同じ計算式を JavaScript で再現し、以下の3行をDOMに挿入する。
  *
  *   厚生年金
  *   ↓ ここに挿入
  *   雇用保険（自動計算）
  *   社会保険料合計（健康保険 ＋ 厚生年金 ＋ 雇用保険）
+ *   課税対象額（課税支給合計 - 社会保険料合計）
  *   ↓
  *   所得税
  */
@@ -190,10 +191,14 @@
 
 	/**
 	 * 各表示を更新する
+	 *
+	 * 雇用保険・社会保険料合計・課税対象額の3つをリアルタイムで再計算し、
+	 * DOM上の表示を更新する。
 	 */
 	function updateAll() {
-		var koyouDisplay = document.getElementById( 'bvsl_koyouhoken_display' );
-		var totalDisplay = document.getElementById( 'bvsl_shakaihoken_total_display' );
+		var koyouDisplay        = document.getElementById( 'bvsl_koyouhoken_display' );
+		var totalDisplay        = document.getElementById( 'bvsl_shakaihoken_total_display' );
+		var kazeisyotokuDisplay = document.getElementById( 'bvsl_kazeisyotoku_display' );
 
 		if ( ! koyouDisplay || ! totalDisplay ) {
 			return;
@@ -206,6 +211,20 @@
 
 		koyouDisplay.textContent = koyou.toLocaleString( 'ja-JP' );
 		totalDisplay.textContent = total.toLocaleString( 'ja-JP' );
+
+		// 課税対象額 = 課税支給合計 - 社会保険料合計
+		// PHP の bvsl_get_kazeisyotoku() に対応
+		// 課税支給合計 = bvsl_get_total_earn()（交通費を含まない）
+		// 0未満の場合は0とする
+		if ( kazeisyotokuDisplay ) {
+			// getKoyouHokenTaisyou() には交通費が含まれるため、交通費を差し引く
+			var kazeiShikyuuTotal = getKoyouHokenTaisyou() - parseAmount( getVal( 'salary_transportation_total' ) );
+			var kazeisyotoku = kazeiShikyuuTotal - total;
+			if ( kazeisyotoku < 0 ) {
+				kazeisyotoku = 0;
+			}
+			kazeisyotokuDisplay.textContent = kazeisyotoku.toLocaleString( 'ja-JP' );
+		}
 	}
 
 	/**
@@ -255,9 +274,24 @@
 			'</td>';
 		totalTr.querySelector( '.bvsl-total-note' ).style.cssText = noteStyle;
 
-		// 厚生年金 <tr> の次に挿入（雇用保険 → 社会保険料合計の順）
+		// --- 課税対象額行 ---
+		// PHP の bvsl_get_kazeisyotoku()（課税支給合計 - 社会保険料合計）に対応
+		var kazeisyotokuTr = document.createElement( 'tr' );
+		kazeisyotokuTr.id        = 'bvsl_kazeisyotoku_row';
+		kazeisyotokuTr.className = 'cf_item bvsl-kazeisyotoku';
+		kazeisyotokuTr.innerHTML =
+			'<th class="text-nowrap"><label>課税対象額</label></th>' +
+			'<td>' +
+				'<span id="bvsl_kazeisyotoku_display" class="bvsl-calc-amount">0</span>' +
+				'<span class="bvsl-calc-unit"> 円</span>' +
+				'<span class="bvsl-calc-note">（課税支給合計 - 社会保険料合計）</span>' +
+			'</td>';
+		kazeisyotokuTr.querySelector( '.bvsl-calc-note' ).style.cssText = noteStyle;
+
+		// 厚生年金 <tr> の次に挿入（雇用保険 → 社会保険料合計 → 課税対象額の順）
 		nenkinTr.parentNode.insertBefore( koyouTr, nenkinTr.nextSibling );
 		nenkinTr.parentNode.insertBefore( totalTr, koyouTr.nextSibling );
+		nenkinTr.parentNode.insertBefore( kazeisyotokuTr, totalTr.nextSibling );
 
 		// 初期値を計算して表示
 		updateAll();
