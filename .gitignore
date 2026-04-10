@@ -12,3 +12,5 @@ dist/
 vendor/
 temp/
 .phpunit.result.cache
+test-results/
+tests/e2e/screenshots/

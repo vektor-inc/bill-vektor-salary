@@ -32,6 +32,86 @@
 	}
 
 	/**
+	 * 雇用保険料率テーブル
+	 * PHP の bvsl_get_koyou_hoken_rate_table() に対応
+	 *
+	 * 事業の種類 => 給与対象時期 => 料率
+	 */
+	var koyouHokenRateTable = {
+		general: {
+			'20260401_after':  5 / 1000,
+			'20250401_after':  5.5 / 1000,
+			'20230401_after':  6 / 1000,
+			'20221001_after':  5 / 1000,
+			'20220930_before': 3 / 1000
+		},
+		agriculture: {
+			'20260401_after':  6 / 1000,
+			'20250401_after':  6.5 / 1000,
+			'20230401_after':  7 / 1000,
+			'20221001_after':  6 / 1000,
+			'20220930_before': 4 / 1000
+		},
+		construction: {
+			'20260401_after':  6 / 1000,
+			'20250401_after':  6.5 / 1000,
+			'20230401_after':  7 / 1000,
+			'20221001_after':  6 / 1000,
+			'20220930_before': 4 / 1000
+		}
+	};
+
+	/**
+	 * 選択中のスタッフのメタデータを取得する
+	 *
+	 * bvslAdminSalary.staffDefaults からスタッフIDに対応する
+	 * メタデータオブジェクトを返す。未設定の場合は null を返す。
+	 *
+	 * @return {Object|null} スタッフメタデータ
+	 */
+	function getStaffMeta() {
+		var staffSelect = document.getElementById( 'salary_staff' );
+		if ( ! staffSelect || ! staffSelect.value ) {
+			return null;
+		}
+		if ( typeof bvslAdminSalary !== 'undefined' &&
+			bvslAdminSalary.staffDefaults &&
+			bvslAdminSalary.staffDefaults[ staffSelect.value ] ) {
+			return bvslAdminSalary.staffDefaults[ staffSelect.value ];
+		}
+		return null;
+	}
+
+	/**
+	 * 事業の種類を取得する
+	 * PHP の bvsl_get_business_type() に対応
+	 *
+	 * 優先度: 給与明細 > スタッフ > グローバル設定
+	 *
+	 * @return {string} 事業の種類（general / agriculture / construction）
+	 */
+	function getBusinessType() {
+		// 1. 給与明細の設定を確認する。
+		var salarySelect = document.getElementById( 'salary_business_type' );
+		if ( salarySelect && salarySelect.value ) {
+			return salarySelect.value;
+		}
+
+		// 2. スタッフの設定を確認する。
+		var staffMeta = getStaffMeta();
+		if ( staffMeta && staffMeta.salary_business_type ) {
+			return staffMeta.salary_business_type;
+		}
+
+		// 3. グローバル設定を確認する。
+		if ( typeof bvslAdminSalary !== 'undefined' && bvslAdminSalary.globalBusinessType ) {
+			return bvslAdminSalary.globalBusinessType;
+		}
+
+		return 'general';
+	}
+
+	/**
 	 * 雇用保険料率を取得する
 	 * PHP の bvsl_get_koyou_hoken_rate() に対応
 	 *
@@ -39,13 +119,12 @@
 	 * @return {number} 料率
 	 */
 	function getKoyouHokenRate( term ) {
-		if ( '20250401_after' === term ) {
-			return 5.5 / 1000;
-		} else if ( '20230401_after' === term ) {
-			return 6 / 1000;
-		} else if ( '20221001_after' === term ) {
-			return 5 / 1000;
+		var businessType = getBusinessType();
+		if ( koyouHokenRateTable[ businessType ] &&
+			koyouHokenRateTable[ businessType ][ term ] !== undefined ) {
+			return koyouHokenRateTable[ businessType ][ term ];
 		}
+		// 未知の時期の場合はデフォルト（一般・〜令和4年9月）
 		return 3 / 1000;
 	}
 
@@ -193,6 +272,8 @@
 			'salary_holiday_total',
 			'salary_transportation_total',
 			'salary_target_term',
+			'salary_staff',
+			'salary_business_type',
 		];
 		watchIds.forEach( function ( id ) {
 			var el = document.getElementById( id );
@@ -218,6 +299,67 @@
 						updateAll();
 					}
 				} );
+			}
+		}
+
+		// スタッフ選択時にスタッフのデフォルト値を各フィールドに反映する。
+		// 空のフィールドのみ反映し、既に入力済みの値は上書きしない。
+		var staffSelect = document.getElementById( 'salary_staff' );
+		if ( staffSelect ) {
+			staffSelect.addEventListener( 'change', applyStaffDefaults );
+		}
+	}
+
+	/**
+	 * スタッフ選択時にスタッフのデフォルト値を各フィールドに反映する
+	 *
+	 * bvslAdminSalary.staffDefaults から選択中のスタッフのメタデータを取得し、
+	 * 空のフィールドのみに値を反映する。
+	 */
+	function applyStaffDefaults() {
+		var staffMeta = getStaffMeta();
+		if ( ! staffMeta ) {
+			return;
+		}
+
+		// テキスト入力フィールド: 空の場合のみ反映する。
+		var textFields = [
+			'salary_staff_number',
+			'salary_fuyou',
+			'salary_base',
+			'salary_transportation_total',
+		];
+		textFields.forEach( function ( id ) {
+			if ( ! staffMeta[ id ] ) {
+				return;
+			}
+			var el = document.getElementById( id );
+			if ( el && ! el.value ) {
+				el.value = staffMeta[ id ];
+				// input イベントを発火して再計算をトリガーする。
+				el.dispatchEvent( new Event( 'input', { bubbles: true } ) );
+			}
+		} );
+
+		// セレクトフィールド: 未選択（空文字）の場合のみ反映する。
+		if ( staffMeta.salary_business_type ) {
+			var businessTypeEl = document.getElementById( 'salary_business_type' );
+			if ( businessTypeEl && ! businessTypeEl.value ) {
+				businessTypeEl.value = staffMeta.salary_business_type;
+				businessTypeEl.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+			}
+		}
+
+		// 雇用保険チェックボックス: スタッフ側で「自動計算しない」の場合に反映する。
+		if ( staffMeta.salary_koyouhoken ) {
+			var koyouCheckbox = document.getElementById( 'salary_koyouhoken' );
+			// チェックボックスの値は配列で保存されるため文字列比較する。
+			var isNotAutoCal = ( Array.isArray( staffMeta.salary_koyouhoken ) &&
+				staffMeta.salary_koyouhoken.indexOf( 'not_auto_cal' ) !== -1 ) ||
+				staffMeta.salary_koyouhoken === 'not_auto_cal';
+			if ( koyouCheckbox && isNotAutoCal && ! koyouCheckbox.checked ) {
+				koyouCheckbox.checked = true;
+				koyouCheckbox.dispatchEvent( new Event( 'change', { bubbles: true } ) );
 			}
 		}
 	}

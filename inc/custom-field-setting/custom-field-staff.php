@@ -45,7 +45,7 @@ class Staff_Custom_Fields {
 			'salary_staff_number'            => array(
 				'label'       => 'Staff No.',
 				'type'        => 'text',
-				'description' => '※各明細で別途手入力する必要があります。',
+				'description' => '給与明細作成時にスタッフを選択すると自動反映されます。',
 				'required'    => false,
 				'sanitize'    => 'sanitize_text_field',
 			),
@@ -102,6 +102,18 @@ class Staff_Custom_Fields {
 				'description' => '',
 				'required'    => false,
 				'sanitize'    => 'bvsl_sanitize_staff_amount',
+			),
+			'salary_business_type'           => array(
+				'label'       => '事業の種類',
+				'type'        => 'select',
+				'description' => '雇用保険料率の算出に使用します。<a href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000108634.html" target="_blank">業種の判断について（厚生労働省）</a>',
+				'options'     => array(
+					'general'      => '一般の事業',
+					'agriculture'  => '農林水産・清酒製造の事業',
+					'construction' => '建設の事業',
+				),
+				'required'    => false,
+				'sanitize'    => 'sanitize_text_field',
 			),
 			'salary_koyouhoken'              => array(
 				'label'       => '雇用保険',

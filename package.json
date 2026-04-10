@@ -9,6 +9,7 @@
 		"phpunit": "wp-env run tests-cli --env-cwd='wp-content/plugins/bill-vektor-salary' vendor/bin/phpunit -c .phpunit.xml --verbose"
 	},
 	"devDependencies": {
+		"@playwright/test": "^1.59.1",
 		"@wordpress/env": "^10.21.0",
 		"grunt": "~1.5.3",
 		"grunt-wp-i18n": "~1.0.3",

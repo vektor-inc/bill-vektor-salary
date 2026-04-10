@@ -70,20 +70,74 @@ function bvsl_admin_enqueue_scripts( $hook ) {
 		true
 	);
 
+	// スタッフごとのメタデータマッピングを構築する。
+	// スタッフ選択時の自動反映と事業種類の判定に使用する。
+	// transient キャッシュで毎回のDBクエリを回避する。
+	$staff_defaults = get_transient( 'bvsl_staff_defaults' );
+	if ( false === $staff_defaults ) {
+		$staff_defaults  = array();
+		$staff_meta_keys = array(
+			'salary_staff_number',
+			'salary_fuyou',
+			'salary_base',
+			'salary_transportation_total',
+			'salary_koyouhoken',
+			'salary_business_type',
+		);
+		$staff_posts     = get_posts(
+			array(
+				'post_type'      => 'staff',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+			)
+		);
+		foreach ( $staff_posts as $staff_id ) {
+			$meta = array();
+			foreach ( $staff_meta_keys as $key ) {
+				$value = get_post_meta( $staff_id, $key, true );
+				if ( '' !== $value && false !== $value ) {
+					$meta[ $key ] = $value;
+				}
+			}
+			if ( ! empty( $meta ) ) {
+				$staff_defaults[ (string) $staff_id ] = $meta;
+			}
+		}
+		set_transient( 'bvsl_staff_defaults', $staff_defaults, HOUR_IN_SECONDS );
+	}
+
 	wp_localize_script(
 		'bvsl-admin-salary',
 		'bvslAdminSalary',
 		array(
-			'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
-			'nonce'           => wp_create_nonce( 'bvsl_salary_admin_nonce' ),
-			'pdfNonce'        => wp_create_nonce( 'bvsl_generate_salary_pdf_nonce' ),
-			'mailNonce'       => wp_create_nonce( 'bvsl_send_salary_mail_nonce' ),
-			'commonMessageId' => 'bvsl-common-message-row',
-			'termMessages'    => $term_messages,
-			'postId'          => $post_id,
+			'ajaxUrl'            => admin_url( 'admin-ajax.php' ),
+			'nonce'              => wp_create_nonce( 'bvsl_salary_admin_nonce' ),
+			'pdfNonce'           => wp_create_nonce( 'bvsl_generate_salary_pdf_nonce' ),
+			'mailNonce'          => wp_create_nonce( 'bvsl_send_salary_mail_nonce' ),
+			'commonMessageId'    => 'bvsl-common-message-row',
+			'termMessages'       => $term_messages,
+			'postId'             => $post_id,
+			'staffDefaults'      => (object) $staff_defaults,
+			'globalBusinessType' => get_option( 'bvsl_business_type', 'general' ),
 		)
 	);
 }
+
+/**
+ * スタッフ投稿の保存・削除時にスタッフデフォルトキャッシュを無効化する。
+ *
+ * @param int $post_id 投稿ID。
+ */
+function bvsl_invalidate_staff_defaults_cache( $post_id ) {
+	if ( 'staff' === get_post_type( $post_id ) ) {
+		delete_transient( 'bvsl_staff_defaults' );
+	}
+}
+add_action( 'save_post', 'bvsl_invalidate_staff_defaults_cache' );
+add_action( 'delete_post', 'bvsl_invalidate_staff_defaults_cache' );
+add_action( 'trashed_post', 'bvsl_invalidate_staff_defaults_cache' );
+add_action( 'untrashed_post', 'bvsl_invalidate_staff_defaults_cache' );
 
 require_once 'inc/duplicate-doc.php';
 require_once 'inc/staff/staff.php';
@@ -91,6 +145,7 @@ require_once 'inc/template-tags.php';
 require_once 'inc/salary-message.php';
 require_once 'inc/salary-pdf.php';
 require_once 'inc/salary-mail.php';
+require_once 'inc/settings.php';
 require_once 'inc/custom-field-setting/custom-field-salary-normal.php';
 require_once 'inc/custom-field-setting/custom-field-salary-table.php';
 require_once 'inc/custom-field-setting/custom-field-staff.php';
