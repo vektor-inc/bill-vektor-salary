@@ -64,6 +64,9 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 		await page.locator( '#publish' ).click();
 		await page.waitForLoadState( 'networkidle' );
 
+		// 投稿が正常に公開されたことを確認する。
+		await expect( page.locator( '#message' ) ).toBeVisible();
+
 		// スクリーンショット: スタッフ保存後。
 		await page.screenshot( { path: 'tests/e2e/screenshots/04-staff-saved.png', fullPage: true } );
 	} );
@@ -101,31 +104,29 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 			}
 		}
 
-		if ( staffOptionValue ) {
-			await staffSelect.selectOption( staffOptionValue );
+		// スタッフが見つからない場合はテストを失敗させる。
+		expect( staffOptionValue, 'E2E自動反映テスト用スタッフが見つかりませんでした' ).toBeTruthy();
 
-			// changeイベント後、少し待つ。
-			await page.waitForTimeout( 500 );
+		await staffSelect.selectOption( staffOptionValue );
 
-			// Staff No.が自動反映されたことを確認する。
-			const staffNumber = page.locator( '#salary_staff_number' );
-			await expect( staffNumber ).toHaveValue( 'E2E-002' );
+		// Staff No.が自動反映されるまで待つ。
+		const staffNumber = page.locator( '#salary_staff_number' );
+		await expect( staffNumber ).toHaveValue( 'E2E-002' );
 
-			// 基本給が自動反映されたことを確認する。
-			const baseSalary = page.locator( '#salary_base' );
-			await expect( baseSalary ).toHaveValue( '300000' );
+		// 基本給が自動反映されたことを確認する。
+		const baseSalary = page.locator( '#salary_base' );
+		await expect( baseSalary ).toHaveValue( '300000' );
 
-			// 交通費が自動反映されたことを確認する。
-			const transportation = page.locator( '#salary_transportation_total' );
-			await expect( transportation ).toHaveValue( '15000' );
+		// 交通費が自動反映されたことを確認する。
+		const transportation = page.locator( '#salary_transportation_total' );
+		await expect( transportation ).toHaveValue( '15000' );
 
-			// 事業の種類が自動反映されたことを確認する。
-			const businessType = page.locator( '#salary_business_type' );
-			await expect( businessType ).toHaveValue( 'agriculture' );
+		// 事業の種類が自動反映されたことを確認する。
+		const businessType = page.locator( '#salary_business_type' );
+		await expect( businessType ).toHaveValue( 'agriculture' );
 
-			// スクリーンショット: スタッフ選択後の自動反映結果。
-			await page.screenshot( { path: 'tests/e2e/screenshots/06-salary-staff-selected.png', fullPage: true } );
-		}
+		// スクリーンショット: スタッフ選択後の自動反映結果。
+		await page.screenshot( { path: 'tests/e2e/screenshots/06-salary-staff-selected.png', fullPage: true } );
 	} );
 
 	test( '4. 給与明細 - 既存値は上書きされない', async ( { page } ) => {
@@ -149,16 +150,20 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 			}
 		}
 
-		if ( staffOptionValue ) {
-			await staffSelect.selectOption( staffOptionValue );
-			await page.waitForTimeout( 500 );
+		// スタッフが見つからない場合はテストを失敗させる。
+		expect( staffOptionValue, 'E2E自動反映テスト用スタッフが見つかりませんでした' ).toBeTruthy();
 
-			// 基本給は手動入力値（350000）が保持されていることを確認する。
-			await expect( baseSalary ).toHaveValue( '350000' );
+		await staffSelect.selectOption( staffOptionValue );
 
-			// スクリーンショット: 既存値が上書きされないことの確認。
-			await page.screenshot( { path: 'tests/e2e/screenshots/07-salary-no-overwrite.png', fullPage: true } );
-		}
+		// Staff No.が自動反映されるまで待つ（他のフィールドも反映済みと判断できる）。
+		const staffNumber = page.locator( '#salary_staff_number' );
+		await expect( staffNumber ).toHaveValue( 'E2E-002' );
+
+		// 基本給は手動入力値（350000）が保持されていることを確認する。
+		await expect( baseSalary ).toHaveValue( '350000' );
+
+		// スクリーンショット: 既存値が上書きされないことの確認。
+		await page.screenshot( { path: 'tests/e2e/screenshots/07-salary-no-overwrite.png', fullPage: true } );
 	} );
 
 	test( '5. 雇用保険料率 - 事業種類別の計算確認', async ( { page } ) => {
@@ -175,10 +180,7 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 		// 「一般の事業」を選択する。
 		await page.locator( '#salary_business_type' ).selectOption( 'general' );
 
-		// 再計算のトリガーを待つ。
-		await page.waitForTimeout( 500 );
-
-		// 雇用保険料が1500（300000 × 5/1000）であることを確認する。
+		// 雇用保険料が1500（300000 × 5/1000）に更新されるまで待つ。
 		const koyouHoken = page.locator( '#bvsl_koyouhoken_display' );
 		await expect( koyouHoken ).toHaveText( '1,500' );
 
@@ -187,9 +189,8 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 
 		// 「建設の事業」に変更する。
 		await page.locator( '#salary_business_type' ).selectOption( 'construction' );
-		await page.waitForTimeout( 500 );
 
-		// 雇用保険料が1800（300000 × 6/1000）であることを確認する。
+		// 雇用保険料が1800（300000 × 6/1000）に更新されるまで待つ。
 		await expect( koyouHoken ).toHaveText( '1,800' );
 
 		// スクリーンショット: 建設の事業・令和8年の料率。
@@ -229,7 +230,6 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 
 		// 令和7年4月1日〜 を選択 → 1650（300000 × 5.5/1000）。
 		await page.locator( '#salary_target_term' ).selectOption( '20250401_after' );
-		await page.waitForTimeout( 500 );
 		const koyouHoken = page.locator( '#bvsl_koyouhoken_display' );
 		await expect( koyouHoken ).toHaveText( '1,650' );
 
@@ -238,7 +238,6 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 
 		// 令和5年4月1日〜 を選択 → 1800（300000 × 6/1000）。
 		await page.locator( '#salary_target_term' ).selectOption( '20230401_after' );
-		await page.waitForTimeout( 500 );
 		await expect( koyouHoken ).toHaveText( '1,800' );
 
 		// スクリーンショット: 令和5年の料率（デグレ確認）。
