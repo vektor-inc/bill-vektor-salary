@@ -5,7 +5,6 @@ Tags: comments, spam
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.9
-Stable tag: 0.11.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -15,6 +14,7 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 == Changelog ==
 
+= 0.12.0 =
 * [ 機能追加 ] 投稿タイプ「給与テンプレート」を追加（スタッフごとの給与明細の雛形として利用）
 * [ 機能追加 ] 給与明細一覧画面に、支給分を指定すると公開中の給与テンプレートをすべて給与明細として下書き展開する一括登録パネルを追加
 * [ 仕様変更 ] 給与明細のカスタムフィールド定義を給与テンプレートでも共通利用するように変更（給与テンプレートでは「発行済PDF」など給与明細固有の項目のみ非表示）
