@@ -575,10 +575,13 @@ class BVSL_Bulk_Create_From_Template {
 			// salary_staff からタイトルを再生成してしまい、「/ 支給分」部分が落ちる現象が起こり得る。
 			// それを避けるため、wp_update_post の前後で bvsl_title_auto_save を一時的に外し、
 			// 1リクエスト内のタイトル更新を 1 回に集約している。
-			$title = trim( get_the_title( $staff_id ) . ' / ' . $term->name, ' /' );
-			$has_title_hook = has_action( 'save_post', 'bvsl_title_auto_save' );
-			if ( false !== $has_title_hook ) {
-				remove_action( 'save_post', 'bvsl_title_auto_save', $has_title_hook );
+			//
+			// bvsl_title_auto_save はデフォルト優先度（10）で登録されているので、
+			// remove/add は明示的に 10 を指定する。has_action の戻り値に依存せず意図を明確にする。
+			$title                 = trim( get_the_title( $staff_id ) . ' / ' . $term->name, ' /' );
+			$title_hook_registered = ( false !== has_action( 'save_post', 'bvsl_title_auto_save' ) );
+			if ( $title_hook_registered ) {
+				remove_action( 'save_post', 'bvsl_title_auto_save', 10 );
 			}
 			wp_update_post(
 				array(
@@ -587,8 +590,8 @@ class BVSL_Bulk_Create_From_Template {
 					'post_title'  => '' !== $title ? $title : get_the_title( $new_post_id ),
 				)
 			);
-			if ( false !== $has_title_hook ) {
-				add_action( 'save_post', 'bvsl_title_auto_save', $has_title_hook );
+			if ( $title_hook_registered ) {
+				add_action( 'save_post', 'bvsl_title_auto_save', 10 );
 			}
 
 			++$created;
