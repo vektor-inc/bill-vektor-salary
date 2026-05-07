@@ -102,8 +102,10 @@ class BVSL_Bulk_Create_From_Template {
 		$js_abs_path  = $plugin_dir . '/' . $js_rel_path;
 
 		// バージョン文字列はファイルの mtime を使う（既存 enqueue 実装と揃える）。
-		$css_version = file_exists( $css_abs_path ) ? (string) filemtime( $css_abs_path ) : false;
-		$js_version  = file_exists( $js_abs_path ) ? (string) filemtime( $js_abs_path ) : false;
+		// ファイル不在時のフォールバックも既存 bvsl_admin_enqueue_scripts() に合わせて '1.0.1' を使う。
+		// false を渡すと WP コアのバージョンが付与されてしまう副作用があるため文字列固定にする。
+		$css_version = file_exists( $css_abs_path ) ? (string) filemtime( $css_abs_path ) : '1.0.1';
+		$js_version  = file_exists( $js_abs_path ) ? (string) filemtime( $js_abs_path ) : '1.0.1';
 
 		wp_enqueue_style(
 			'bvsl-admin-bulk-create-panel',
