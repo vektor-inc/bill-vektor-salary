@@ -67,8 +67,74 @@ class BVSL_Bulk_Create_From_Template {
 		add_action( 'admin_notices', array( __CLASS__, 'render_panel' ), 1 );
 		// パネル送信後の結果通知。
 		add_action( 'admin_notices', array( __CLASS__, 'render_result_notice' ) );
+		// 一括登録パネル用の CSS / JS を給与明細一覧画面でのみ読み込む。
+		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		// admin-post.php エンドポイント。
 		add_action( 'admin_post_' . self::ACTION, array( __CLASS__, 'handle' ) );
+	}
+
+	/**
+	 * 一括登録パネル用の CSS / JS を読み込む。
+	 *
+	 * 給与明細（salary）一覧画面（hook_suffix: edit-salary）でのみ読み込む。
+	 * ファイルの更新時刻をバージョンに使うことで、ブラウザキャッシュの破棄を自動化する。
+	 *
+	 * @param string $hook_suffix 現在の管理画面の hook suffix。
+	 * @return void
+	 */
+	public static function enqueue_assets( $hook_suffix ) {
+		// 給与明細一覧画面（edit.php?post_type=salary）の hook suffix のみ対象。
+		if ( 'edit-salary' !== $hook_suffix ) {
+			return;
+		}
+		// 念のため画面判定でもガード（権限のないユーザーには読ませない）。
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		// プラグインのルート（bill-vektor-salary.php がある場所）を基準にパスを組み立てる。
+		// __DIR__ は inc/salary-template/ なので、2 階層上がプラグインのルート。
+		$plugin_dir   = dirname( __DIR__, 2 );
+		$plugin_file  = $plugin_dir . '/bill-vektor-salary.php';
+		$css_rel_path = 'assets/css/admin-bulk-create-panel.css';
+		$js_rel_path  = 'assets/js/admin-bulk-create-panel.js';
+		$css_abs_path = $plugin_dir . '/' . $css_rel_path;
+		$js_abs_path  = $plugin_dir . '/' . $js_rel_path;
+
+		// バージョン文字列はファイルの mtime を使う（既存 enqueue 実装と揃える）。
+		$css_version = file_exists( $css_abs_path ) ? (string) filemtime( $css_abs_path ) : false;
+		$js_version  = file_exists( $js_abs_path ) ? (string) filemtime( $js_abs_path ) : false;
+
+		wp_enqueue_style(
+			'bvsl-admin-bulk-create-panel',
+			plugins_url( $css_rel_path, $plugin_file ),
+			array(),
+			$css_version
+		);
+
+		wp_enqueue_script(
+			'bvsl-admin-bulk-create-panel',
+			plugins_url( $js_rel_path, $plugin_file ),
+			array(),
+			$js_version,
+			true
+		);
+
+		// 旧インラインスクリプトで PHP から JS に渡していた値を localize で渡す。
+		// 公開テンプレ件数はパネル描画時に確定するため、ここでも同じ取得関数を使う。
+		$template_count = count( self::get_target_templates() );
+		wp_localize_script(
+			'bvsl-admin-bulk-create-panel',
+			'bvslBulkCreatePanel',
+			array(
+				'templateCount' => $template_count,
+				'i18n'          => array(
+					'selectTerm' => __( '支給分を選んでください。', 'bill-vektor-salary' ),
+					'summary'    => __( '公開中のテンプレート %1$d 件を「%2$s」で下書き作成します。', 'bill-vektor-salary' ),
+					'confirm'    => __( '公開中のテンプレート %1$d 件を「%2$s」で下書き作成します。よろしいですか？', 'bill-vektor-salary' ),
+				),
+			)
+		);
 	}
 
 	/**
@@ -169,11 +235,11 @@ class BVSL_Bulk_Create_From_Template {
 
 		$action_url = admin_url( 'admin-post.php' );
 		?>
-		<details class="bvsl-bulk-create" <?php echo $is_open ? 'open' : ''; ?> style="margin: 16px 0; padding: 12px 16px; background:#fff; border:1px solid #ccd0d4; border-left: 4px solid #2271b1;">
-			<summary style="cursor:pointer; font-weight:600; font-size:14px; padding: 4px 0;">
+		<details class="bvsl-bulk-create" <?php echo $is_open ? 'open' : ''; ?>>
+			<summary>
 				<?php echo esc_html__( '給与テンプレートから一括登録', 'bill-vektor-salary' ); ?>
 			</summary>
-			<div style="padding-top: 12px;">
+			<div class="bvsl-bulk-create__body">
 
 			<?php if ( ! $has_templates ) : ?>
 				<?php // テンプレ 0 件時はフォームを出さず、登録案内のみ大きく出す。 ?>
@@ -198,7 +264,7 @@ class BVSL_Bulk_Create_From_Template {
 					<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
 					<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION ); ?>" />
 
-					<p style="margin-top:0;">
+					<p class="bvsl-bulk-create__lead">
 						<?php
 						printf(
 							/* translators: %d: 公開中の給与テンプレ件数 */
@@ -228,14 +294,14 @@ class BVSL_Bulk_Create_From_Template {
 									<?php echo esc_html__( '生成件数の目安', 'bill-vektor-salary' ); ?>
 								</th>
 								<td>
-									<p id="bvsl-bulk-summary" style="margin:0;">
+									<p id="bvsl-bulk-summary" class="bvsl-bulk-create__summary">
 										<?php echo esc_html__( '支給分を選んでください。', 'bill-vektor-salary' ); ?>
 									</p>
-									<p style="margin:6px 0 0; color:#555;">
+									<p class="bvsl-bulk-create__note">
 										<?php echo esc_html__( '生成された給与明細はすべて下書きとして登録されます。同一スタッフの同一支給分の明細が既にある場合は自動でスキップされます。スタッフ未設定のテンプレートもスキップされます。', 'bill-vektor-salary' ); ?>
 									</p>
 									<?php if ( $template_count > self::MAX_TEMPLATE_COUNT ) : ?>
-										<p style="margin:6px 0 0; color:#b32d2e;">
+										<p class="bvsl-bulk-create__warning">
 											<?php
 											printf(
 												/* translators: 1: 上限件数 2: 公開中テンプレ件数 */
@@ -257,65 +323,6 @@ class BVSL_Bulk_Create_From_Template {
 						</button>
 					</p>
 				</form>
-
-				<script>
-				( function() {
-					var form = document.getElementById( 'bvsl-bulk-create-form' );
-					if ( ! form ) {
-						return;
-					}
-					var termSel = document.getElementById( 'bvsl-bulk-term' );
-					var summary = document.getElementById( 'bvsl-bulk-summary' );
-
-					// 翻訳テンプレート（1 文化、%1$d / %2$s をフロントで sprintf 風に置換）。
-					var i18n = {
-						selectTerm: <?php echo wp_json_encode( __( '支給分を選んでください。', 'bill-vektor-salary' ) ); ?>,
-						summary:    <?php echo wp_json_encode( __( '公開中のテンプレート %1$d 件を「%2$s」で下書き作成します。', 'bill-vektor-salary' ) ); ?>,
-						confirm:    <?php echo wp_json_encode( __( '公開中のテンプレート %1$d 件を「%2$s」で下書き作成します。よろしいですか？', 'bill-vektor-salary' ) ); ?>
-					};
-					// 公開テンプレ件数は PHP 側で確定済みの値を埋め込む。
-					var templateCount = <?php echo (int) $template_count; ?>;
-
-					function format( tpl, n, term ) {
-						return tpl.replace( '%1$d', n ).replace( '%2$s', term );
-					}
-
-					function termText() {
-						if ( termSel && termSel.value && termSel.options[ termSel.selectedIndex ] ) {
-							return termSel.options[ termSel.selectedIndex ].text;
-						}
-						return '';
-					}
-
-					// 件数表示の更新。テンプレ件数は固定で、支給分を選んだら文言を 1 文に揃える。
-					function updateSummary() {
-						var term = termText();
-						if ( '' === term ) {
-							summary.textContent = i18n.selectTerm;
-						} else {
-							summary.textContent = format( i18n.summary, templateCount, term );
-						}
-					}
-
-					if ( termSel ) {
-						termSel.addEventListener( 'change', updateSummary );
-					}
-
-					// 送信前の最終確認。
-					form.addEventListener( 'submit', function ( e ) {
-						var term = termText();
-						if ( '' === term ) {
-							// 支給分未選択は HTML 側の required で弾かれるはずだが念のため。
-							return;
-						}
-						if ( ! window.confirm( format( i18n.confirm, templateCount, term ) ) ) {
-							e.preventDefault();
-						}
-					} );
-
-					updateSummary();
-				} )();
-				</script>
 			<?php endif; ?>
 
 			</div>

@@ -1,0 +1,50 @@
+/**
+ * 給与明細一覧画面の「給与テンプレートから一括登録」パネル用スタイル。
+ *
+ * inc/salary-template/class-bvsl-bulk-create-from-template.php の
+ * インラインスタイルを外部化したもの。挙動は変えていない。
+ */
+
+/* パネル全体（折りたたみコンテナ） */
+.bvsl-bulk-create {
+	margin: 16px 0;
+	padding: 12px 16px;
+	background: #fff;
+	border: 1px solid #ccd0d4;
+	border-left: 4px solid #2271b1;
+}
+
+/* 折りたたみ見出し */
+.bvsl-bulk-create > summary {
+	cursor: pointer;
+	font-weight: 600;
+	font-size: 14px;
+	padding: 4px 0;
+}
+
+/* パネル本体（summary の下のコンテンツ領域） */
+.bvsl-bulk-create__body {
+	padding-top: 12px;
+}
+
+/* テンプレ件数説明（先頭の段落のマージン詰め） */
+.bvsl-bulk-create__lead {
+	margin-top: 0;
+}
+
+/* 生成件数の目安テキスト */
+.bvsl-bulk-create__summary {
+	margin: 0;
+}
+
+/* 補足説明（重複スキップなどの注意文） */
+.bvsl-bulk-create__note {
+	margin: 6px 0 0;
+	color: #555;
+}
+
+/* 上限件数超過の警告メッセージ */
+.bvsl-bulk-create__warning {
+	margin: 6px 0 0;
+	color: #b32d2e;
+}
