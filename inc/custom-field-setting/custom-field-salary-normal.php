@@ -5,6 +5,11 @@
  * salary（給与明細）と salary-template（給与テンプレート）で同じカスタムフィールド構成を共有する。
  * 表示する/しないの差分は $context（投稿タイプ）で切り替える。
  *
+ * 運用イメージ:
+ * - 給与テンプレートはスタッフごとに作成する雛形。スタッフフィールド・Staff No. もテンプレで設定する。
+ * - 一括登録は支給分を 1 つ指定し、公開状態のテンプレ全件を salary に展開する（vk-booking-manager-pro
+ *   のシフト一括登録に近い運用）。展開時に各テンプレからスタッフメタを引いて salary 側に書き戻す。
+ *
  * @package Bill_Vektor_Salary
  */
 
@@ -109,14 +114,15 @@ class Salary_Normal_Custom_Fields {
 	/**
 	 * カスタムフィールド定義配列を返す。
 	 *
-	 * $context（投稿タイプ）に応じて、給与テンプレートでは不要なフィールド（スタッフ選択・PDF履歴用フィールド）を除外する。
+	 * $context（投稿タイプ）に応じて、給与テンプレートでは不要なフィールド（PDF 発行履歴フィールドなど）を除外する。
+	 * 「スタッフ」「Staff No.」は salary / salary-template の両方で表示する（テンプレはスタッフごとに作成するため）。
 	 *
 	 * @param string $context 投稿タイプ（'salary' または 'salary-template'）。未指定時は salary 想定。
 	 * @return array<string, array<string, mixed>> カスタムフィールド定義の連想配列。
 	 */
 	public static function custom_fields_array( $context = 'salary' ) {
 
-		// スタッフ選択肢の構築は salary 用のみ必要。テンプレでは使用しないがコードの単純化のため共通で組み立てておく。
+		// スタッフ選択肢の構築。salary・salary-template の両方で「スタッフ」セレクトを表示する。
 		$args        = array(
 			'post_type'      => 'staff',
 			'posts_per_page' => -1,
@@ -197,11 +203,9 @@ class Salary_Normal_Custom_Fields {
 			),
 		);
 
-		// 給与テンプレートでは「対象スタッフ」は一括登録時に指定するため、テンプレ自体には不要。
-		// PDF発行履歴用の salary_send_pdf もテンプレでは表示しない。
+		// 給与テンプレートでは PDF 発行履歴用の salary_send_pdf を表示しない。
+		// （「スタッフ」「Staff No.」はテンプレでも設定する想定なので残す）。
 		if ( 'salary-template' === $context ) {
-			unset( $custom_fields_array['salary_staff'] );
-			unset( $custom_fields_array['salary_staff_number'] );
 			unset( $custom_fields_array['salary_send_pdf'] );
 		}
 

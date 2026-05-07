@@ -3,9 +3,14 @@
  * 給与テンプレートからの一括登録クラス。
  *
  * 給与明細（salary）一覧画面の上部に折りたたみ可能なパネルを描画し、
- * テンプレート × 支給分 × 対象スタッフ複数 の組み合わせで salary 投稿を下書きで一括生成する。
+ * **支給分（salary-term）を 1 つ指定すると、公開状態の給与テンプレ全件** を
+ * 各スタッフ向けの salary 投稿として下書きで一括生成する。
  *
- * vk-booking-manager-pro の class-shift-editor.php の bulk_create パターンを参考にしている。
+ * 運用イメージ:
+ * - 給与テンプレートはスタッフごとに作成する雛形。
+ * - 毎月（支給分ごとに）一括登録パネルで支給分を選んで実行 → 公開テンプレ全件が salary に展開される。
+ * - vk-booking-manager-pro の class-shift-editor.php の bulk_create パターンに揃えた、
+ *   「テンプレ全件を支給分指定で一気に展開する」シンプルな運用。
  *
  * @package Bill_Vektor_Salary
  */
@@ -33,12 +38,12 @@ class BVSL_Bulk_Create_From_Template {
 	const NONCE_NAME = '_bvsl_bulk_create_nonce';
 
 	/**
-	 * 一括登録の対象スタッフ数の上限。
+	 * 1 リクエストで処理できる公開テンプレ数の上限。
 	 *
-	 * 上限を超えるリクエストは admin notice でエラー表示して拒否する。
 	 * 大量生成による負荷・誤操作の被害範囲を抑える保険。
+	 * 公開状態の給与テンプレが上限を超える場合は admin notice でエラー表示して拒否する。
 	 */
-	const MAX_STAFF_COUNT = 500;
+	const MAX_TEMPLATE_COUNT = 500;
 
 	/**
 	 * 結果通知用 transient のキープレフィックス。
@@ -96,72 +101,23 @@ class BVSL_Bulk_Create_From_Template {
 	}
 
 	/**
-	 * 一括登録元として選択可能な salary-template の投稿一覧を取得する。
+	 * 一括登録の処理対象になる給与テンプレ投稿一覧を取得する。
 	 *
-	 * 「下書き」のテンプレは未完成として誤配リスクがあるため除外し、
-	 * publish / private のみを対象にする。
+	 * 公開状態（publish / private）のテンプレのみが処理対象。
+	 * draft のテンプレは未完成として誤配リスクがあるため除外する。
 	 *
-	 * @return WP_Post[] テンプレ投稿の配列。
+	 * @return WP_Post[] 給与テンプレ投稿の配列。
 	 */
-	private static function get_template_posts() {
+	private static function get_target_templates() {
 		return get_posts(
 			array(
 				'post_type'      => 'salary-template',
-				// 指摘 F: draft は誤配リスクのため除外。publish / private のみ。
 				'post_status'    => array( 'publish', 'private' ),
 				'posts_per_page' => -1,
 				'orderby'        => 'title',
 				'order'          => 'ASC',
 			)
 		);
-	}
-
-	/**
-	 * 一括登録の対象になりうるスタッフ投稿を取得する。
-	 *
-	 * client_hidden が立っているスタッフは除外する（プルダウン同様）。
-	 *
-	 * @return WP_Post[] スタッフ投稿の配列。
-	 */
-	private static function get_staff_posts() {
-		$args  = array(
-			'post_type'      => 'staff',
-			'post_status'    => array( 'publish' ),
-			'posts_per_page' => -1,
-			'meta_key'       => 'salary_staff_number',
-			'orderby'        => 'meta_value',
-			'order'          => 'ASC',
-		);
-		$posts = get_posts( $args );
-		// salary_staff_number 未設定のスタッフが取りこぼされないよう、再取得して合流させる。
-		$all   = get_posts(
-			array(
-				'post_type'      => 'staff',
-				'post_status'    => array( 'publish' ),
-				'posts_per_page' => -1,
-				'orderby'        => 'title',
-				'order'          => 'ASC',
-			)
-		);
-		$known = array();
-		foreach ( $posts as $p ) {
-			$known[ $p->ID ] = true;
-		}
-		foreach ( $all as $p ) {
-			if ( ! isset( $known[ $p->ID ] ) ) {
-				$posts[] = $p;
-			}
-		}
-		// プルダウン非表示スタッフを除外。
-		$visible = array();
-		foreach ( $posts as $p ) {
-			$hidden = get_post_meta( $p->ID, 'client_hidden', true );
-			if ( $hidden ) {
-				continue;
-			}
-			$visible[] = $p;
-		}
-		return $visible;
 	}
 
 	/**
@@ -186,7 +142,7 @@ class BVSL_Bulk_Create_From_Template {
 	 * 給与明細一覧画面の上部に一括登録パネルを描画する。
 	 *
 	 * 通常は <details> で折りたたまれた状態。
-	 * 「結果通知が transient に存在する」または「補助導線から bvsl_template_id が渡された」ときは open。
+	 * 「結果通知が transient に存在する」または「前提（テンプレ / 支給分）が未整備」のときは open。
 	 *
 	 * @return void
 	 */
@@ -199,28 +155,17 @@ class BVSL_Bulk_Create_From_Template {
 			return;
 		}
 
-		$templates = self::get_template_posts();
-		$staff     = self::get_staff_posts();
-		$terms     = self::get_salary_terms();
+		$templates      = self::get_target_templates();
+		$terms          = self::get_salary_terms();
+		$has_templates  = ! empty( $templates );
+		$has_terms      = ! empty( $terms );
+		$template_count = count( $templates );
 
-		// テンプレが1件もない場合は作成導線を出す。
-		$has_templates = ! empty( $templates );
-		$has_terms     = ! empty( $terms );
-		$has_staff     = ! empty( $staff );
-
-		// 補助導線（給与テンプレート編集画面の「このテンプレで一括登録」）から渡された選択済みテンプレID。
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- 単なる初期選択値として読むだけのため nonce は不要。
-		$preset_template_id = isset( $_GET['bvsl_template_id'] ) ? (int) $_GET['bvsl_template_id'] : 0;
-
-		// 指摘 D: 折りたたみ状態の判定。
-		// 結果 transient があるとき or 補助導線から来たとき or（運用上の親切として）
-		// テンプレ未作成 / 支給分未登録 / スタッフ未登録のいずれかでガイダンスを見せたい場合は開いておく。
+		// 折りたたみ状態の判定:
+		// - 結果 transient があるとき（直近の操作結果を見せる）
+		// - テンプレ / 支給分のいずれかが未整備のときはガイダンスを見せたいので open。
 		$has_result_transient = (bool) get_transient( self::result_transient_key() );
-		$is_open              = $has_result_transient
-			|| $preset_template_id > 0
-			|| ! $has_templates
-			|| ! $has_terms
-			|| ! $has_staff;
+		$is_open              = $has_result_transient || ! $has_templates || ! $has_terms;
 
 		$action_url = admin_url( 'admin-post.php' );
 		?>
@@ -231,27 +176,21 @@ class BVSL_Bulk_Create_From_Template {
 			<div style="padding-top: 12px;">
 
 			<?php if ( ! $has_templates ) : ?>
-				<?php // 指摘 J: テンプレ0件時は他のフォーム要素を出さず、案内＋遷移ボタンのみ大きく出す。 ?>
-				<p><?php echo esc_html__( '給与テンプレートがまだ登録されていません。先にテンプレートを作成してください。', 'bill-vektor-salary' ); ?></p>
+				<?php // テンプレ 0 件時はフォームを出さず、登録案内のみ大きく出す。 ?>
+				<p>
+					<?php echo esc_html__( '給与テンプレートがまだ登録されていません。先にスタッフごとの給与テンプレートを作成してください。', 'bill-vektor-salary' ); ?>
+				</p>
 				<p>
 					<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=salary-template' ) ); ?>" class="button button-primary button-hero">
 						<?php echo esc_html__( '給与テンプレートを作成', 'bill-vektor-salary' ); ?>
 					</a>
 				</p>
 			<?php elseif ( ! $has_terms ) : ?>
-				<?php // 指摘 J: 支給分0件時はフォームを出さず、登録案内のみ。 ?>
+				<?php // 支給分 0 件時はフォームを出さず、登録案内のみ。 ?>
 				<p><?php echo esc_html__( '一括登録には「支給分」が必要です。先に支給分を登録してください。', 'bill-vektor-salary' ); ?></p>
 				<p>
 					<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=salary-term&post_type=salary' ) ); ?>" class="button button-primary button-hero">
 						<?php echo esc_html__( '支給分を登録する', 'bill-vektor-salary' ); ?>
-					</a>
-				</p>
-			<?php elseif ( ! $has_staff ) : ?>
-				<?php // 指摘 J: スタッフ0件時はフォームを出さず、登録案内のみ。 ?>
-				<p><?php echo esc_html__( '一括登録の対象になるスタッフが登録されていません。先にスタッフを登録してください。', 'bill-vektor-salary' ); ?></p>
-				<p>
-					<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=staff' ) ); ?>" class="button button-primary button-hero">
-						<?php echo esc_html__( 'スタッフを登録する', 'bill-vektor-salary' ); ?>
 					</a>
 				</p>
 			<?php else : ?>
@@ -259,23 +198,18 @@ class BVSL_Bulk_Create_From_Template {
 					<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
 					<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION ); ?>" />
 
+					<p style="margin-top:0;">
+						<?php
+						printf(
+							/* translators: %d: 公開中の給与テンプレ件数 */
+							esc_html__( '公開中の給与テンプレートは %d 件です。指定した支給分でこの全件を給与明細（下書き）として一括展開します。', 'bill-vektor-salary' ),
+							(int) $template_count
+						);
+						?>
+					</p>
+
 					<table class="form-table" role="presentation">
 						<tbody>
-							<tr>
-								<th scope="row">
-									<label for="bvsl-bulk-template"><?php echo esc_html__( 'テンプレート', 'bill-vektor-salary' ); ?></label>
-								</th>
-								<td>
-									<select id="bvsl-bulk-template" name="bvsl_template_id" required>
-										<option value=""><?php echo esc_html__( '選択してください', 'bill-vektor-salary' ); ?></option>
-										<?php foreach ( $templates as $tpl ) : ?>
-											<option value="<?php echo esc_attr( $tpl->ID ); ?>" <?php selected( $preset_template_id, $tpl->ID ); ?>>
-												<?php echo esc_html( get_the_title( $tpl ) ); ?>
-											</option>
-										<?php endforeach; ?>
-									</select>
-								</td>
-							</tr>
 							<tr>
 								<th scope="row">
 									<label for="bvsl-bulk-term"><?php echo esc_html__( '支給分', 'bill-vektor-salary' ); ?></label>
@@ -291,59 +225,34 @@ class BVSL_Bulk_Create_From_Template {
 							</tr>
 							<tr>
 								<th scope="row">
-									<?php // 指摘 I: fieldset/legend でアクセシビリティ対応。 ?>
-									<?php echo esc_html__( '対象スタッフ', 'bill-vektor-salary' ); ?>
-								</th>
-								<td>
-									<fieldset>
-										<legend class="screen-reader-text"><?php echo esc_html__( '対象スタッフ', 'bill-vektor-salary' ); ?></legend>
-										<p style="margin-top:0;">
-											<button type="button" class="button button-small" id="bvsl-bulk-staff-all" aria-controls="bvsl-bulk-staff-list">
-												<?php echo esc_html__( 'すべて選択', 'bill-vektor-salary' ); ?>
-											</button>
-											<button type="button" class="button button-small" id="bvsl-bulk-staff-none" aria-controls="bvsl-bulk-staff-list">
-												<?php echo esc_html__( 'すべて解除', 'bill-vektor-salary' ); ?>
-											</button>
-										</p>
-										<div id="bvsl-bulk-staff-list" style="display:flex; flex-wrap:wrap; gap:6px 16px; max-height:160px; overflow-y:auto; padding:8px; border:1px solid #dcdcde; border-radius:4px;">
-											<?php foreach ( $staff as $s ) : ?>
-												<label style="display:inline-flex; align-items:center; gap:4px; min-width:180px;">
-													<?php // 指摘 G: 初期は全員未チェック。明示的に「すべて選択」または個別チェックさせる。 ?>
-													<input type="checkbox" class="bvsl-bulk-staff-checkbox" name="bvsl_staff_ids[]" value="<?php echo esc_attr( $s->ID ); ?>" />
-													<span><?php echo esc_html( get_the_title( $s ) ); ?></span>
-												</label>
-											<?php endforeach; ?>
-										</div>
-										<p class="description" style="margin-top:6px;">
-											<?php
-											printf(
-												/* translators: %d: 一括登録の上限件数 */
-												esc_html__( '一度に登録できるのは最大 %d 名までです。', 'bill-vektor-salary' ),
-												(int) self::MAX_STAFF_COUNT
-											);
-											?>
-										</p>
-									</fieldset>
-								</td>
-							</tr>
-							<tr>
-								<th scope="row">
 									<?php echo esc_html__( '生成件数の目安', 'bill-vektor-salary' ); ?>
 								</th>
 								<td>
 									<p id="bvsl-bulk-summary" style="margin:0;">
-										<?php echo esc_html__( '対象スタッフを選んでください。', 'bill-vektor-salary' ); ?>
+										<?php echo esc_html__( '支給分を選んでください。', 'bill-vektor-salary' ); ?>
 									</p>
 									<p style="margin:6px 0 0; color:#555;">
-										<?php echo esc_html__( '生成された給与明細はすべて下書きとして登録されます。同一スタッフの同一支給分の明細が既にある場合は自動でスキップされます。', 'bill-vektor-salary' ); ?>
+										<?php echo esc_html__( '生成された給与明細はすべて下書きとして登録されます。同一スタッフの同一支給分の明細が既にある場合は自動でスキップされます。スタッフ未設定のテンプレートもスキップされます。', 'bill-vektor-salary' ); ?>
 									</p>
+									<?php if ( $template_count > self::MAX_TEMPLATE_COUNT ) : ?>
+										<p style="margin:6px 0 0; color:#b32d2e;">
+											<?php
+											printf(
+												/* translators: 1: 上限件数 2: 公開中テンプレ件数 */
+												esc_html__( '一度に処理できるテンプレートは最大 %1$d 件までです（現在 %2$d 件）。', 'bill-vektor-salary' ),
+												(int) self::MAX_TEMPLATE_COUNT,
+												(int) $template_count
+											);
+											?>
+										</p>
+									<?php endif; ?>
 								</td>
 							</tr>
 						</tbody>
 					</table>
 
 					<p>
-						<button type="submit" class="button button-primary" id="bvsl-bulk-submit">
+						<button type="submit" class="button button-primary" id="bvsl-bulk-submit" <?php echo ( $template_count > self::MAX_TEMPLATE_COUNT ) ? 'disabled' : ''; ?>>
 							<?php echo esc_html__( '一括登録（下書きで作成）', 'bill-vektor-salary' ); ?>
 						</button>
 					</p>
@@ -351,33 +260,24 @@ class BVSL_Bulk_Create_From_Template {
 
 				<script>
 				( function() {
-					var form    = document.getElementById( 'bvsl-bulk-create-form' );
+					var form = document.getElementById( 'bvsl-bulk-create-form' );
 					if ( ! form ) {
 						return;
 					}
-					var allBtn  = document.getElementById( 'bvsl-bulk-staff-all' );
-					var noneBtn = document.getElementById( 'bvsl-bulk-staff-none' );
 					var termSel = document.getElementById( 'bvsl-bulk-term' );
 					var summary = document.getElementById( 'bvsl-bulk-summary' );
 
-					// 翻訳テンプレート（指摘 E に対応して 1 文化したもの）。
-					// %1$d / %2$s をフロントで sprintf 風に置換する。
+					// 翻訳テンプレート（1 文化、%1$d / %2$s をフロントで sprintf 風に置換）。
 					var i18n = {
-						selectStaff:    <?php echo wp_json_encode( __( '対象スタッフを選んでください。', 'bill-vektor-salary' ) ); ?>,
-						selectTerm:     <?php echo wp_json_encode( __( '%1$d 名選択中です。支給分を選んでください。', 'bill-vektor-salary' ) ); ?>,
-						summary:        <?php echo wp_json_encode( __( '%1$d 名分の給与明細を「%2$s」で下書き作成します。', 'bill-vektor-salary' ) ); ?>,
-						confirm:        <?php echo wp_json_encode( __( '%1$d 名分の給与明細を「%2$s」で下書き作成します。よろしいですか？', 'bill-vektor-salary' ) ); ?>,
-						selectAtLeastOne: <?php echo wp_json_encode( __( '対象スタッフを少なくとも1名選択してください。', 'bill-vektor-salary' ) ); ?>,
-						tooMany:        <?php echo wp_json_encode( sprintf( __( '対象スタッフが多すぎます（上限 %d 名）。選択を減らしてください。', 'bill-vektor-salary' ), (int) self::MAX_STAFF_COUNT ) ); ?>
+						selectTerm: <?php echo wp_json_encode( __( '支給分を選んでください。', 'bill-vektor-salary' ) ); ?>,
+						summary:    <?php echo wp_json_encode( __( '公開中のテンプレート %1$d 件を「%2$s」で下書き作成します。', 'bill-vektor-salary' ) ); ?>,
+						confirm:    <?php echo wp_json_encode( __( '公開中のテンプレート %1$d 件を「%2$s」で下書き作成します。よろしいですか？', 'bill-vektor-salary' ) ); ?>
 					};
-					var maxStaff = <?php echo (int) self::MAX_STAFF_COUNT; ?>;
+					// 公開テンプレ件数は PHP 側で確定済みの値を埋め込む。
+					var templateCount = <?php echo (int) $template_count; ?>;
 
 					function format( tpl, n, term ) {
 						return tpl.replace( '%1$d', n ).replace( '%2$s', term );
-					}
-
-					function checkboxes() {
-						return form.querySelectorAll( '.bvsl-bulk-staff-checkbox' );
 					}
 
 					function termText() {
@@ -387,63 +287,28 @@ class BVSL_Bulk_Create_From_Template {
 						return '';
 					}
 
-					// 件数表示と確認ダイアログ用の文言を更新する（指摘 E：1文化）。
+					// 件数表示の更新。テンプレ件数は固定で、支給分を選んだら文言を 1 文に揃える。
 					function updateSummary() {
-						var checked = 0;
-						checkboxes().forEach( function ( cb ) {
-							if ( cb.checked ) { checked++; }
-						} );
 						var term = termText();
-						if ( checked === 0 ) {
-							summary.textContent = i18n.selectStaff;
-						} else if ( '' === term ) {
-							summary.textContent = format( i18n.selectTerm, checked, '' );
+						if ( '' === term ) {
+							summary.textContent = i18n.selectTerm;
 						} else {
-							summary.textContent = format( i18n.summary, checked, term );
+							summary.textContent = format( i18n.summary, templateCount, term );
 						}
 					}
 
-					if ( allBtn ) {
-						allBtn.addEventListener( 'click', function () {
-							checkboxes().forEach( function ( cb ) { cb.checked = true; } );
-							updateSummary();
-						} );
-					}
-					if ( noneBtn ) {
-						noneBtn.addEventListener( 'click', function () {
-							checkboxes().forEach( function ( cb ) { cb.checked = false; } );
-							updateSummary();
-						} );
-					}
-					checkboxes().forEach( function ( cb ) {
-						cb.addEventListener( 'change', updateSummary );
-					} );
 					if ( termSel ) {
 						termSel.addEventListener( 'change', updateSummary );
 					}
 
-					// 送信前の最終確認。誤操作の保険として件数を提示する。
+					// 送信前の最終確認。
 					form.addEventListener( 'submit', function ( e ) {
-						var checked = 0;
-						checkboxes().forEach( function ( cb ) {
-							if ( cb.checked ) { checked++; }
-						} );
-						if ( checked === 0 ) {
-							e.preventDefault();
-							window.alert( i18n.selectAtLeastOne );
-							return;
-						}
-						if ( checked > maxStaff ) {
-							e.preventDefault();
-							window.alert( i18n.tooMany );
-							return;
-						}
 						var term = termText();
 						if ( '' === term ) {
-							// 支給分未選択時は HTML 側の required で弾かれるはずだが念のため。
+							// 支給分未選択は HTML 側の required で弾かれるはずだが念のため。
 							return;
 						}
-						if ( ! window.confirm( format( i18n.confirm, checked, term ) ) ) {
+						if ( ! window.confirm( format( i18n.confirm, templateCount, term ) ) ) {
 							e.preventDefault();
 						}
 					} );
@@ -461,14 +326,15 @@ class BVSL_Bulk_Create_From_Template {
 	/**
 	 * 一括登録の admin-post ハンドラ。
 	 *
-	 * 入力検証 → 件数上限チェック → 既存重複スキップ判定 → bill_copy_post でテンプレを複製 →
-	 * salary_staff / salary_staff_number の上書き + salary-term の付与、を選択スタッフ分ループ。
+	 * 入力検証 → 件数上限チェック → 公開テンプレ全件をループしながら
+	 * 各テンプレを bill_copy_post で salary に複製 → スタッフ・支給分メタを上書き → タイトル整形。
+	 * スキップ理由は重複・スタッフ未設定の 2 種類で分けてカウントする。
 	 * 結果は transient に格納し、リダイレクト先で表示・削除する。
 	 *
 	 * 注意: bill_copy_post() はテーマ側の関数で、テンプレ投稿の全 meta（_ で始まらないもの）を
 	 * salary 投稿に複製する。将来テンプレ専用の機微 meta（編集者情報など、salary に持っていきたくないもの）
 	 * が増える場合は、このルートでは情報漏洩のリスクがあるため、メタを allowlist 方式で
-	 * 明示コピーする独自複製関数に切り替えること（指摘 K）。
+	 * 明示コピーする独自複製関数に切り替えること。
 	 *
 	 * @return void
 	 */
@@ -486,42 +352,27 @@ class BVSL_Bulk_Create_From_Template {
 		);
 
 		// 入力サニタイズ。
-		$template_id = isset( $_POST['bvsl_template_id'] ) ? (int) $_POST['bvsl_template_id'] : 0;
-		$term_id     = isset( $_POST['bvsl_term_id'] ) ? (int) $_POST['bvsl_term_id'] : 0;
-		$staff_ids   = array();
-		if ( isset( $_POST['bvsl_staff_ids'] ) && is_array( $_POST['bvsl_staff_ids'] ) ) {
-			foreach ( wp_unslash( $_POST['bvsl_staff_ids'] ) as $sid ) {
-				$sid = (int) $sid;
-				if ( $sid > 0 ) {
-					$staff_ids[] = $sid;
-				}
-			}
-			$staff_ids = array_values( array_unique( $staff_ids ) );
-		}
+		$term_id = isset( $_POST['bvsl_term_id'] ) ? (int) $_POST['bvsl_term_id'] : 0;
 
 		// 入力チェック。
-		$errors = array();
-		if ( $template_id <= 0 || 'salary-template' !== get_post_type( $template_id ) ) {
-			$errors[] = 'invalid_template';
-		}
 		$term = $term_id > 0 ? get_term( $term_id, 'salary-term' ) : null;
 		if ( ! $term || is_wp_error( $term ) ) {
-			$errors[] = 'invalid_term';
+			self::store_result( array( 'error' => 'invalid_term' ) );
+			wp_safe_redirect( $redirect_base );
+			exit;
 		}
-		if ( empty( $staff_ids ) ) {
-			$errors[] = 'no_staff';
+
+		// 公開テンプレを全件取得。
+		$templates = self::get_target_templates();
+		if ( empty( $templates ) ) {
+			self::store_result( array( 'error' => 'no_templates' ) );
+			wp_safe_redirect( $redirect_base );
+			exit;
 		}
-		// 指摘 C: 件数上限チェック（500件）。負荷・誤操作の被害範囲を抑える保険。
-		if ( count( $staff_ids ) > self::MAX_STAFF_COUNT ) {
-			$errors[] = 'too_many_staff';
-		}
-		if ( ! empty( $errors ) ) {
-			// エラーは結果 transient に積んでリダイレクト（クエリ汚染を避ける）。
-			self::store_result(
-				array(
-					'error' => sanitize_key( $errors[0] ),
-				)
-			);
+
+		// 件数上限チェック（公開テンプレ件数で判定）。
+		if ( count( $templates ) > self::MAX_TEMPLATE_COUNT ) {
+			self::store_result( array( 'error' => 'too_many_templates' ) );
 			wp_safe_redirect( $redirect_base );
 			exit;
 		}
@@ -533,37 +384,57 @@ class BVSL_Bulk_Create_From_Template {
 			exit;
 		}
 
-		$created             = 0;
-		$skipped             = 0;
-		$skipped_staff_names = array();
+		$created               = 0;
+		$skipped_duplicate     = 0;
+		$skipped_no_staff      = 0;
+		$skipped_other         = 0;
+		$skipped_dup_titles    = array();
+		$skipped_no_staff_tpls = array();
 
-		foreach ( $staff_ids as $staff_id ) {
-			// 同一スタッフ × 同一支給分の明細が既に存在する場合はスキップ（誤操作の保険）。
-			if ( self::salary_exists_for_staff_and_term( $staff_id, $term_id ) ) {
-				++$skipped;
-				$skipped_staff_names[] = (string) get_the_title( $staff_id );
+		foreach ( $templates as $template ) {
+			$template_id = (int) $template->ID;
+			if ( $template_id <= 0 ) {
 				continue;
 			}
 
-			// テンプレートを salary 投稿として複製する。
+			// テンプレからスタッフ ID を取得。
+			$staff_id = (int) get_post_meta( $template_id, 'salary_staff', true );
+			if ( $staff_id <= 0 ) {
+				// スタッフ未設定のテンプレはスキップ（カテゴリ別カウント）。
+				++$skipped_no_staff;
+				$skipped_no_staff_tpls[] = (string) get_the_title( $template );
+				continue;
+			}
+
+			// 同一スタッフ × 同一支給分の明細が既に存在する場合はスキップ。
+			if ( self::salary_exists_for_staff_and_term( $staff_id, $term_id ) ) {
+				++$skipped_duplicate;
+				$skipped_dup_titles[] = (string) get_the_title( $staff_id );
+				continue;
+			}
+
+			// テンプレを salary 投稿として複製する。
 			// $table_copy_type = 'all' で品目テーブルもコピー。
 			// $duplicate_type  = 'full' でカスタムフィールドとタクソノミーをまとめてコピー。
-			// 注意: bill_copy_post() はテンプレの全 meta を salary に複製する（指摘 K のコメント参照）。
+			// 注意: bill_copy_post() はテンプレの全 meta を salary に複製する（クラス PHPDoc 参照）。
 			$new_post_id = bill_copy_post( $template_id, 'salary', 'all', 'full' );
 			if ( ! $new_post_id || is_wp_error( $new_post_id ) ) {
-				++$skipped;
-				$skipped_staff_names[] = (string) get_the_title( $staff_id );
+				++$skipped_other;
 				continue;
 			}
 
-			// 対象スタッフのメタ情報をテンプレ複製後に上書きする。
+			// スタッフメタを念のため明示的に上書き（テンプレ複製の段階で入っているはずだが防御的に）。
 			update_post_meta( $new_post_id, 'salary_staff', (string) $staff_id );
-			$staff_number = (string) get_post_meta( $staff_id, 'salary_staff_number', true );
+			$staff_number = (string) get_post_meta( $template_id, 'salary_staff_number', true );
+			if ( '' === $staff_number ) {
+				// テンプレ側に Staff No. が無ければスタッフ投稿側から引く。
+				$staff_number = (string) get_post_meta( $staff_id, 'salary_staff_number', true );
+			}
 			if ( '' !== $staff_number ) {
 				update_post_meta( $new_post_id, 'salary_staff_number', $staff_number );
 			}
 
-			// 支給分（salary-term）を付与。テンプレ複製の段階で付いていない可能性があるため明示的に上書き。
+			// 支給分（salary-term）を付与。テンプレ複製の段階では付いていないため明示的に上書き。
 			wp_set_object_terms( $new_post_id, array( (int) $term_id ), 'salary-term', false );
 
 			// タイトルを「スタッフ名 / 支給分」で揃え、同時に post_status を draft に固定。
@@ -600,10 +471,13 @@ class BVSL_Bulk_Create_From_Template {
 		// 結果を transient に格納（クエリ汚染を避け、偽通知を踏ませない）。
 		self::store_result(
 			array(
-				'created'             => $created,
-				'skipped'             => $skipped,
-				'skipped_staff_names' => $skipped_staff_names,
-				'term_name'           => (string) $term->name,
+				'created'               => $created,
+				'skipped_duplicate'     => $skipped_duplicate,
+				'skipped_no_staff'      => $skipped_no_staff,
+				'skipped_other'         => $skipped_other,
+				'skipped_dup_titles'    => $skipped_dup_titles,
+				'skipped_no_staff_tpls' => $skipped_no_staff_tpls,
+				'term_name'             => (string) $term->name,
 			)
 		);
 
@@ -666,7 +540,7 @@ class BVSL_Bulk_Create_From_Template {
 		if ( ! self::is_salary_list_screen() ) {
 			return;
 		}
-		// 指摘 A: 結果通知も manage_options 権限を要求する。
+		// 結果通知も manage_options 権限を要求する。
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
@@ -682,15 +556,14 @@ class BVSL_Bulk_Create_From_Template {
 		// エラー系。
 		if ( ! empty( $result['error'] ) ) {
 			$messages = array(
-				'invalid_template' => __( 'テンプレートが選択されていないか、無効です。', 'bill-vektor-salary' ),
-				'invalid_term'     => __( '支給分が選択されていないか、無効です。', 'bill-vektor-salary' ),
-				'no_staff'         => __( '対象スタッフを少なくとも1名選択してください。', 'bill-vektor-salary' ),
-				'too_many_staff'   => sprintf(
+				'invalid_term'       => __( '支給分が選択されていないか、無効です。', 'bill-vektor-salary' ),
+				'no_templates'       => __( '公開中の給与テンプレートが見つかりません。', 'bill-vektor-salary' ),
+				'too_many_templates' => sprintf(
 					/* translators: %d: 上限件数 */
-					__( '対象スタッフが多すぎます（上限 %d 名）。選択を減らしてください。', 'bill-vektor-salary' ),
-					(int) self::MAX_STAFF_COUNT
+					__( '公開中の給与テンプレートが多すぎます（上限 %d 件）。', 'bill-vektor-salary' ),
+					(int) self::MAX_TEMPLATE_COUNT
 				),
-				'no_copy_function' => __( '親テーマ「BillVektor」が有効化されていないため、一括登録を実行できません。', 'bill-vektor-salary' ),
+				'no_copy_function'   => __( '親テーマ「BillVektor」が有効化されていないため、一括登録を実行できません。', 'bill-vektor-salary' ),
 			);
 			$err = (string) $result['error'];
 			$msg = isset( $messages[ $err ] ) ? $messages[ $err ] : __( '一括登録に失敗しました。', 'bill-vektor-salary' );
@@ -703,32 +576,57 @@ class BVSL_Bulk_Create_From_Template {
 		}
 
 		// 成功系。
-		$created             = isset( $result['created'] ) ? (int) $result['created'] : 0;
-		$skipped             = isset( $result['skipped'] ) ? (int) $result['skipped'] : 0;
-		$skipped_staff_names = isset( $result['skipped_staff_names'] ) && is_array( $result['skipped_staff_names'] )
-			? array_values( array_filter( array_map( 'strval', $result['skipped_staff_names'] ) ) )
+		$created           = isset( $result['created'] ) ? (int) $result['created'] : 0;
+		$skipped_duplicate = isset( $result['skipped_duplicate'] ) ? (int) $result['skipped_duplicate'] : 0;
+		$skipped_no_staff  = isset( $result['skipped_no_staff'] ) ? (int) $result['skipped_no_staff'] : 0;
+		$skipped_other     = isset( $result['skipped_other'] ) ? (int) $result['skipped_other'] : 0;
+
+		$dup_titles = isset( $result['skipped_dup_titles'] ) && is_array( $result['skipped_dup_titles'] )
+			? array_values( array_filter( array_map( 'strval', $result['skipped_dup_titles'] ) ) )
+			: array();
+		$no_staff_titles = isset( $result['skipped_no_staff_tpls'] ) && is_array( $result['skipped_no_staff_tpls'] )
+			? array_values( array_filter( array_map( 'strval', $result['skipped_no_staff_tpls'] ) ) )
 			: array();
 
 		$message = sprintf(
-			/* translators: 1: 生成件数 2: スキップ件数 */
-			__( '給与明細を一括登録しました。生成: %1$d 件 / スキップ: %2$d 件', 'bill-vektor-salary' ),
+			/* translators: 1: 生成件数 2: 重複スキップ件数 3: スタッフ未設定スキップ件数 */
+			__( '給与明細を一括登録しました。生成: %1$d 件 / 重複スキップ: %2$d 件 / スタッフ未設定スキップ: %3$d 件', 'bill-vektor-salary' ),
 			max( 0, $created ),
-			max( 0, $skipped )
+			max( 0, $skipped_duplicate ),
+			max( 0, $skipped_no_staff )
 		);
 		?>
 		<div class="notice notice-success is-dismissible">
 			<p><?php echo esc_html( $message ); ?></p>
-			<?php if ( ! empty( $skipped_staff_names ) ) : ?>
-				<?php
-				// 指摘 B: スキップしたスタッフ名を列挙。長くなる場合に備えて details で折りたたみ。
-				$names_text = implode( '、', $skipped_staff_names );
-				?>
+
+			<?php if ( ! empty( $dup_titles ) ) : ?>
 				<details style="margin: 4px 0 8px;">
 					<summary style="cursor:pointer;">
-						<?php echo esc_html__( 'スキップしたスタッフ（既に同一支給分の明細あり）', 'bill-vektor-salary' ); ?>
+						<?php echo esc_html__( '重複でスキップしたスタッフ（既に同一支給分の明細あり）', 'bill-vektor-salary' ); ?>
 					</summary>
-					<p style="margin: 6px 0 0;"><?php echo esc_html( $names_text ); ?></p>
+					<p style="margin: 6px 0 0;"><?php echo esc_html( implode( '、', $dup_titles ) ); ?></p>
 				</details>
+			<?php endif; ?>
+
+			<?php if ( ! empty( $no_staff_titles ) ) : ?>
+				<details style="margin: 4px 0 8px;">
+					<summary style="cursor:pointer;">
+						<?php echo esc_html__( 'スタッフ未設定でスキップしたテンプレート', 'bill-vektor-salary' ); ?>
+					</summary>
+					<p style="margin: 6px 0 0;"><?php echo esc_html( implode( '、', $no_staff_titles ) ); ?></p>
+				</details>
+			<?php endif; ?>
+
+			<?php if ( $skipped_other > 0 ) : ?>
+				<p style="margin: 4px 0 0; color:#555;">
+					<?php
+					printf(
+						/* translators: %d: その他のエラー件数 */
+						esc_html__( 'その他の理由で %d 件スキップされました（複製処理に失敗）。', 'bill-vektor-salary' ),
+						(int) $skipped_other
+					);
+					?>
+				</p>
 			<?php endif; ?>
 		</div>
 		<?php
