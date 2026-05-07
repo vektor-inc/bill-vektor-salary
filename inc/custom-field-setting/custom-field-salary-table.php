@@ -1,32 +1,62 @@
 <?php
-/*
-* 給与明細のカスタムフィールド（品目以外）
-*/
+/**
+ * 給与明細 / 給与テンプレートのカスタムフィールド（明細項目テーブル含む）。
+ *
+ * salary（給与明細）と salary-template（給与テンプレート）でフィールド定義を共有する。
+ *
+ * @package Bill_Vektor_Salary
+ */
 
 class Salary_Table_Custom_Fields {
+
+	/**
+	 * このカスタムフィールド群を適用する投稿タイプ。
+	 *
+	 * @var string[]
+	 */
+	protected static $post_types = array( 'salary', 'salary-template' );
+
+	/**
+	 * フックを登録する。
+	 *
+	 * @return void
+	 */
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'add_metabox' ), 10, 2 );
 		add_action( 'save_post', array( __CLASS__, 'save_custom_fields' ), 10, 2 );
 	}
 
-	// add meta_box
+	/**
+	 * 対象投稿タイプそれぞれにメタボックスを追加する。
+	 *
+	 * 投稿タイプごとにタイトルを切り替える。
+	 *
+	 * @return void
+	 */
 	public static function add_metabox() {
+		foreach ( self::$post_types as $post_type ) {
+			// 指摘 H: post_type ごとにメタボックスのタイトルを分岐させる。
+			$title = ( 'salary-template' === $post_type )
+				? '給与テンプレート給与テーブル'
+				: '給与明細項目';
 
-		$id            = 'meta_box_bill_table';
-		$title         = '給与明細項目';
-		$callback      = array( __CLASS__, 'fields_form' );
-		$screen        = 'salary';
-		$context       = 'advanced';
-		$priority      = 'high';
-		$callback_args = '';
-
-		add_meta_box( $id, $title, $callback, $screen, $context, $priority, $callback_args );
-
+			add_meta_box(
+				'meta_box_bill_table',
+				$title,
+				array( __CLASS__, 'fields_form' ),
+				$post_type,
+				'advanced',
+				'high'
+			);
+		}
 	}
 
+	/**
+	 * メタボックスのフォームを描画する。
+	 *
+	 * @return void
+	 */
 	public static function fields_form() {
-		global $post;
-
 		$custom_fields_array = self::custom_fields_array();
 		$befor_custom_fields = '';
 		VK_Custom_Field_Builder::form_table( $custom_fields_array, $befor_custom_fields );
@@ -52,7 +82,17 @@ class Salary_Table_Custom_Fields {
 		// VK_Custom_Field_Builder_Flexible_Table::form_table_flexible( $custom_fields_array );
 	}
 
-	public static function save_custom_fields() {
+	/**
+	 * カスタムフィールドを保存する。
+	 *
+	 * @param int $post_id 保存対象の投稿ID。
+	 * @return void
+	 */
+	public static function save_custom_fields( $post_id = 0 ) {
+		// 対象投稿タイプ以外は早期 return。
+		if ( ! in_array( get_post_type( $post_id ), self::$post_types, true ) ) {
+			return;
+		}
 
 		$custom_fields_array = self::custom_fields_array();
 		VK_Custom_Field_Builder::save_cf_value( $custom_fields_array );

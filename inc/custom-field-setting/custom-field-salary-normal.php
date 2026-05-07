@@ -1,55 +1,107 @@
 <?php
-/*
-* 給与明細のカスタムフィールド（品目以外）
-*/
+/**
+ * 給与明細 / 給与テンプレートのカスタムフィールド（品目以外）。
+ *
+ * salary（給与明細）と salary-template（給与テンプレート）で同じカスタムフィールド構成を共有する。
+ * 表示する/しないの差分は $context（投稿タイプ）で切り替える。
+ *
+ * 運用イメージ:
+ * - 給与テンプレートはスタッフごとに作成する雛形。スタッフフィールド・Staff No. もテンプレで設定する。
+ * - 一括登録は支給分を 1 つ指定し、公開状態のテンプレ全件を salary に展開する（vk-booking-manager-pro
+ *   のシフト一括登録に近い運用）。展開時に各テンプレからスタッフメタを引いて salary 側に書き戻す。
+ *
+ * @package Bill_Vektor_Salary
+ */
 
 class Salary_Normal_Custom_Fields {
+
+	/**
+	 * このカスタムフィールド群を適用する投稿タイプ。
+	 *
+	 * salary（給与明細）と salary-template（給与テンプレート）で同一構成を再利用する。
+	 *
+	 * @var string[]
+	 */
+	protected static $post_types = array( 'salary', 'salary-template' );
+
+	/**
+	 * フックを登録する。
+	 *
+	 * @return void
+	 */
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'add_metabox' ), 10, 2 );
 		add_action( 'save_post', array( __CLASS__, 'save_custom_fields' ), 10, 2 );
 	}
 
-	// add meta_box
+	/**
+	 * 対象投稿タイプそれぞれにメタボックスを追加する。
+	 *
+	 * 投稿タイプごとにタイトルを切り替えて、給与明細とテンプレートでどちらを編集中か分かるようにする。
+	 *
+	 * @return void
+	 */
 	public static function add_metabox() {
+		foreach ( self::$post_types as $post_type ) {
+			// 指摘 H: post_type ごとにメタボックスのタイトルを分岐させる。
+			$title = ( 'salary-template' === $post_type )
+				? '給与テンプレート基本項目'
+				: '給与明細基本項目';
 
-		$id            = 'meta_box_bill_normal';
-		$title         = '給与明細基本項目';
-		$callback      = array( __CLASS__, 'fields_form' );
-		$screen        = 'salary';
-		$context       = 'advanced';
-		$priority      = 'high';
-		$callback_args = '';
-
-		add_meta_box( $id, $title, $callback, $screen, $context, $priority, $callback_args );
-
+			add_meta_box(
+				'meta_box_bill_normal',
+				$title,
+				array( __CLASS__, 'fields_form' ),
+				$post_type,
+				'advanced',
+				'high'
+			);
+		}
 	}
 
+	/**
+	 * メタボックス内のフォームを描画する。
+	 *
+	 * 現在編集中の投稿タイプに応じて、表示する項目（フィールド・履歴テーブル）を切り替える。
+	 *
+	 * @return void
+	 */
 	public static function fields_form() {
 		global $post;
 
-		$custom_fields_array = Salary_Normal_Custom_Fields::custom_fields_array();
+		$context             = $post ? get_post_type( $post ) : 'salary';
+		$custom_fields_array = self::custom_fields_array( $context );
 		$befor_custom_fields = '';
 		VK_Custom_Field_Builder::form_table( $custom_fields_array, $befor_custom_fields );
 
-		// PDF履歴テーブルをフォームテーブル直後に追加。
-		if ( function_exists( 'bvsl_render_pdf_history_table' ) && $post && $post->ID ) {
-			bvsl_render_pdf_history_table( $post->ID );
-		}
+		// PDF / メール履歴は salary でのみ表示。テンプレでは履歴自体が存在しないため非表示。
+		if ( 'salary' === $context ) {
+			// PDF履歴テーブルをフォームテーブル直後に追加。
+			if ( function_exists( 'bvsl_render_pdf_history_table' ) && $post && $post->ID ) {
+				bvsl_render_pdf_history_table( $post->ID );
+			}
 
-		// メール送信履歴テーブルをフォームテーブル直後に追加。
-		if ( function_exists( 'bvsl_render_mail_history_table' ) && $post && $post->ID ) {
-			bvsl_render_mail_history_table( $post->ID );
+			// メール送信履歴テーブルをフォームテーブル直後に追加。
+			if ( function_exists( 'bvsl_render_mail_history_table' ) && $post && $post->ID ) {
+				bvsl_render_mail_history_table( $post->ID );
+			}
 		}
 	}
 
+	/**
+	 * カスタムフィールドを保存する。
+	 *
+	 * @param int $post_id 保存対象の投稿ID。
+	 * @return void
+	 */
 	public static function save_custom_fields( $post_id = 0 ) {
-		if ( 'salary' !== get_post_type( $post_id ) ) {
+		// 対象投稿タイプ以外の保存処理では何もしない。
+		if ( ! in_array( get_post_type( $post_id ), self::$post_types, true ) ) {
 			return;
 		}
 
-		$custom_fields_array = Salary_Normal_Custom_Fields::custom_fields_array();
-		// $custom_fields_array_no_cf_builder = arra();
-		// $custom_fields_all_array = array_merge(  $custom_fields_array, $custom_fields_array_no_cf_builder );
+		$context             = get_post_type( $post_id );
+		$custom_fields_array = self::custom_fields_array( $context );
 		VK_Custom_Field_Builder::save_cf_value( $custom_fields_array );
 
 		// 新規作成時など未選択の場合でも、メッセージ構成は既定値を保存する。
@@ -59,8 +111,18 @@ class Salary_Normal_Custom_Fields {
 		}
 	}
 
-	public static function custom_fields_array() {
+	/**
+	 * カスタムフィールド定義配列を返す。
+	 *
+	 * $context（投稿タイプ）に応じて、給与テンプレートでは不要なフィールド（PDF 発行履歴フィールドなど）を除外する。
+	 * 「スタッフ」「Staff No.」は salary / salary-template の両方で表示する（テンプレはスタッフごとに作成するため）。
+	 *
+	 * @param string $context 投稿タイプ（'salary' または 'salary-template'）。未指定時は salary 想定。
+	 * @return array<string, array<string, mixed>> カスタムフィールド定義の連想配列。
+	 */
+	public static function custom_fields_array( $context = 'salary' ) {
 
+		// スタッフ選択肢の構築。salary・salary-template の両方で「スタッフ」セレクトを表示する。
 		$args        = array(
 			'post_type'      => 'staff',
 			'posts_per_page' => -1,
@@ -139,13 +201,14 @@ class Salary_Normal_Custom_Fields {
 				'description' => '手動登録されたPDF URL。上記の「PDF発行」機能をご利用ください。',
 				'hidden'      => true,
 			),
-		// 'event_image_main' => array(
-		// 'label' => __('メインイメージ','bill-vektor'),
-		// 'type' => 'image',
-		// 'description' => '',
-		// 'hidden' => true,
-		// ),
 		);
+
+		// 給与テンプレートでは PDF 発行履歴用の salary_send_pdf を表示しない。
+		// （「スタッフ」「Staff No.」はテンプレでも設定する想定なので残す）。
+		if ( 'salary-template' === $context ) {
+			unset( $custom_fields_array['salary_send_pdf'] );
+		}
+
 		return $custom_fields_array;
 	}
 

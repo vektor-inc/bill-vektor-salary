@@ -47,7 +47,7 @@ function bvsl_admin_enqueue_scripts( $hook ) {
 	if ( ! in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
 		return;
 	}
-	// salary 投稿タイプのみ対象
+	// salary 投稿タイプのみ対象（給与テンプレートでは PDF / メール機能を使わないため除外）
 	$post_id   = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
 	$post_type = $post_id ? get_post_type( $post_id ) : ( isset( $_GET['post_type'] ) ? sanitize_key( $_GET['post_type'] ) : '' );
 	if ( 'salary' !== $post_type ) {
@@ -149,6 +149,8 @@ require_once 'inc/settings.php';
 require_once 'inc/custom-field-setting/custom-field-salary-normal.php';
 require_once 'inc/custom-field-setting/custom-field-salary-table.php';
 require_once 'inc/custom-field-setting/custom-field-staff.php';
+require_once 'inc/salary-template/salary-template.php';
+require_once 'inc/salary-template/class-bvsl-bulk-create-from-template.php';
 
 /*
 	PDFテンプレート ブラウザプレビュー
@@ -319,7 +321,8 @@ function bill_add_post_type_salaly() {
 	);
 	register_taxonomy(
 		'salary-type',
-		'salary',
+		// 給与テンプレートでも給与種別を割り当てられるようにする。
+		array( 'salary', 'salary-template' ),
 		array(
 			'hierarchical'          => true,
 			'update_count_callback' => '_update_post_term_count',
