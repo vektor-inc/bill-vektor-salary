@@ -1,6 +1,9 @@
 {
 	"core": null,
 	"plugins": [ "." ],
+	"mappings": {
+		"wp-content/mu-plugins/bvsl-e2e-helper.php": "./tests/e2e/mu-plugins/bvsl-e2e-helper.php"
+	},
 	"config": {
 		"WP_DEBUG": true,
 		"SCRIPT_DEBUG": true,

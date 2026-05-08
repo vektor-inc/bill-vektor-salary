@@ -223,7 +223,12 @@ class BVSL_Bulk_Create_From_Template {
 	/**
 	 * 支給分（salary-term）タクソノミーのターム一覧を取得する。
 	 *
-	 * @return WP_Term[] ターム配列。
+	 * 取得結果は `bvsl_bulk_create_panel_terms` フィルターで絞り込み可能。
+	 * 拡張ポイントとして公開しており、月別の権限制御や特定ロールに見せるタームの絞り込みなど、
+	 * 一括登録パネルのみで効かせたいフィルタリング用途を想定している。
+	 * フィルターで空配列を返した場合、パネルは「支給分未登録」状態として描画される。
+	 *
+	 * @return WP_Term[] ターム配列。エラー時や絞り込み結果が空の場合は空配列を返す。
 	 */
 	private static function get_salary_terms() {
 		$terms = get_terms(
@@ -235,7 +240,19 @@ class BVSL_Bulk_Create_From_Template {
 		if ( is_wp_error( $terms ) ) {
 			return array();
 		}
-		return $terms;
+
+		/**
+		 * 一括登録パネルで対象とする支給分（salary-term）タームを絞り込むフィルター。
+		 *
+		 * 拡張ポイントとして公開。返り値の配列を空にすれば「支給分未登録」表示になる。
+		 * 用途例: 月別の権限制御、特定ロールに見せたいタームの絞り込みなど。
+		 *
+		 * @param WP_Term[] $terms get_terms() の返り値（is_wp_error 時は空配列）。
+		 */
+		$filtered = apply_filters( 'bvsl_bulk_create_panel_terms', $terms );
+
+		// フィルター結果が配列でなければ防御的に空配列に丸める（!empty 判定が壊れないようにする）。
+		return is_array( $filtered ) ? $filtered : array();
 	}
 
 	/**
