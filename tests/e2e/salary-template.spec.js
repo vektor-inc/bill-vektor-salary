@@ -497,210 +497,65 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 	} );
 
 	test( '08-b. 0 件時: 支給分未登録 → 「支給分を登録する」遷移ボタン表示', async ( { page } ) => {
-		// 支給分タームを完全な属性付きで退避し、復元時に元の状態を再現する。
-		// 退避内容:
-		//   - term の全フィールド（name / slug / description / parent / 元の term_id）
-		//   - term meta（key / value 一覧）
-		// 注意: term を delete → create で作り直すと term_id は変わるため、
-		//      term_id 依存のリレーション（postmeta 等）があるテストでは別途注意が必要。
-		//      このテストでは復元直後にテストが終了し、削除中の期間も他データに影響しないため、
-		//      ID 変動は許容する。
+		// salary-term の物理削除は他 worker / 他 spec から「削除中の窓」で 0 件に見えてしまうため、
+		// 共有 wp-env では実施しない（issue #56）。
+		// 代わりにプラグイン本体の `bvsl_bulk_create_panel_terms` フィルターを利用し、
+		// e2e 専用 mu-plugin（tests/e2e/mu-plugins/bvsl-e2e-helper.php）が cookie をトリガーに
+		// 空配列を返す仕組みで、このセッションだけ「支給分 0 件」状態を再現する。
+		//
+		// mu-plugin 側の発火条件は以下の二重ガード:
+		//   1. WP_DEBUG === true（wp-env では .wp-env.json で true に設定済み）
+		//   2. cookie `bvsl_e2e_force_no_terms=1` が付与されている
+		//
+		// この cookie は本テストの中だけで完結させ、テスト終了時に確実に削除する。
+		// DB 状態を一切変更しないため、他 spec / 他 worker への干渉は発生しない。
 
-		// 1) 全 term の term_id 一覧を取得。
-		const termIdsRaw = wpCli( [
-			'term',
-			'list',
-			'salary-term',
-			'--format=ids',
-		] );
-		const termIds = termIdsRaw
-			.trim()
-			.split( /\s+/ )
-			.filter( ( token ) => /^\d+$/.test( token ) );
+		// cookie のスコープを wp-env のホスト URL に固定する。
+		// 既存の他テストと同じ流儀で、playwright.config.js の baseURL とも整合させる。
+		const baseUrl = process.env.WP_BASE_URL || 'http://localhost:5523';
 
-		// 2) 各 term の全データと term meta を JSON で退避。
-		// 形式: [{ term: { name, slug, description, parent, term_id, ... }, meta: [{ meta_key, meta_value }, ...] }, ...]
-		const termBackups = [];
-		for ( const tid of termIds ) {
-			// term 本体の全フィールド取得（parseWpJson で wp-env のプログレス行を除去してから parse）。
-			const termJsonRaw = wpCli( [
-				'term',
-				'get',
-				'salary-term',
-				tid,
-				'--format=json',
-			] );
-			const termData = parseWpJson( termJsonRaw, null );
-
-			// term meta 一覧の取得（同様に parseWpJson で正規化）。
-			const metaJsonRaw = wpCli( [
-				'term',
-				'meta',
-				'list',
-				tid,
-				'--format=json',
-			] );
-			const metaParsed = parseWpJson( metaJsonRaw, [] );
-			const metaList = Array.isArray( metaParsed ) ? metaParsed : [];
-
-			if ( termData ) {
-				termBackups.push( { term: termData, meta: metaList } );
-			}
-		}
-
-		// 3) すべての term を削除。
-		// TODO(#56): salary-term の taxonomy 全削除は、共有 wp-env で他 spec / 他 worker
-		// から「削除中の窓」で 0 件に見える時間が発生するため、本 spec を専用 wp-env / DB に分離するか、
-		// test 08-b の設計を見直す必要がある。本 PR スコープ外として別 issue で対応。
-		if ( termIds.length > 0 ) {
-			wpCli( [ 'term', 'delete', 'salary-term', ...termIds ] );
-		}
-
-		// テスト本体で発生した原例外を保持し、finally の throw による上書きを避ける。
-		// finally の term 復元が失敗した場合は、原例外と復元失敗を AggregateError でまとめて throw し、
-		// 両方の情報を呼び出し側（Playwright のレポート）に伝える。
-		let originalError;
 		try {
+			// e2e 専用 mu-plugin に「支給分 0 件にして欲しい」というシグナルを送る cookie を付与。
+			// path: '/' で wp-admin / フロント問わず全ページに付く。
+			// expires は省略（セッション cookie として扱われ、context 破棄で消える）が、
+			// 念のため finally で明示的に削除する。
+			await page.context().addCookies( [
+				{
+					name: 'bvsl_e2e_force_no_terms',
+					value: '1',
+					url: baseUrl,
+					path: '/',
+				},
+			] );
+
 			await loginAsAdmin( page );
 			await page.goto( '/wp-admin/edit.php?post_type=salary' );
 			await page.waitForLoadState( 'networkidle' );
 
+			// 一括登録パネルが「支給分未登録」状態で描画されていることを確認する。
 			const panel = page.locator( 'details.bvsl-bulk-create' );
 			await expect( panel ).toBeVisible();
+			// 0 件状態のときはガイダンスを見せたいので open になっている想定（render_panel() の仕様）。
 			const isOpen = await panel.evaluate( ( el ) => el.hasAttribute( 'open' ) );
 			expect( isOpen ).toBe( true );
 
+			// ガイダンス文言と遷移リンク（支給分の編集画面）を確認する。
 			await expect( panel ).toContainText( '一括登録には「支給分」が必要です' );
 			const link = panel.getByRole( 'link', { name: '支給分を登録する' } );
 			await expect( link ).toBeVisible();
 			expect( await link.getAttribute( 'href' ) ).toContain( 'edit-tags.php?taxonomy=salary-term' );
 
-			// フォーム自体は出ない。
+			// 0 件状態ではフォーム要素（送信ボタン / select）は描画されない。
 			await expect( panel.locator( '#bvsl-bulk-submit' ) ).toHaveCount( 0 );
 			await expect( panel.locator( '#bvsl-bulk-term' ) ).toHaveCount( 0 );
 
 			await page.screenshot( { path: 'tests/e2e/screenshots/pr48/08b-no-terms.png', fullPage: true } );
-		} catch ( err ) {
-			// 原例外を保持。再 throw は finally で AggregateError / そのまま throw のいずれかに分岐する。
-			originalError = err;
 		} finally {
-			// 4) ターム復元: iterative restore で多階層（孫世代以降）にも対応する。
-			// 元の term_id → 新しい term_id のマッピング（parent 復元用）。
-			const oldIdToNewId = {};
-			// 復元中のエラーを集約し、finally の最後にまとめて throw する。
-			// 個別の catch でログを出すだけだとテストが silently に「成功扱い」になり、
-			// 退避データが欠損したまま後続テストに影響するため、最後に必ず可視化する。
-			const restorationErrors = [];
-
-			// iterative restore: 各イテレーションで「未作成かつ親が解決済み（または root）」の term を作成し、
-			// progressed フラグで打ち切り判定する。これにより、2 パス方式では拾えない多階層
-			// （root → 子 → 孫）の階層も、親が作成された次のイテレーションで子・孫と順番に解決できる。
-			const remaining = termBackups.map( ( backup ) => ( {
-				term: backup.term,
-				meta: backup.meta,
-			} ) );
-			let progressed = true;
-			while ( progressed && remaining.length > 0 ) {
-				progressed = false;
-				// 配列途中で削除するため、後ろから走査する。
-				for ( let i = remaining.length - 1; i >= 0; i-- ) {
-					const t = remaining[ i ].term;
-					const meta = remaining[ i ].meta;
-					const parentOldId = Number( t.parent || 0 );
-					// root（parent=0）か、親が既に解決済みのものだけを今回のイテレーションで処理する。
-					if ( parentOldId !== 0 && oldIdToNewId[ parentOldId ] === undefined ) {
-						continue;
-					}
-
-					const createArgs = [
-						'term',
-						'create',
-						'salary-term',
-						String( t.name || '' ),
-					];
-					if ( t.slug ) {
-						createArgs.push( `--slug=${ t.slug }` );
-					}
-					if ( t.description ) {
-						createArgs.push( `--description=${ t.description }` );
-					}
-					// parent は元の term_id を新しい term_id に解決して指定する。
-					if ( parentOldId !== 0 ) {
-						createArgs.push( `--parent=${ oldIdToNewId[ parentOldId ] }` );
-					}
-					// --porcelain で再作成後の term_id を取得し、ID 解決マップに入れる。
-					createArgs.push( '--porcelain' );
-
-					try {
-						const newIdRaw = wpCli( createArgs ).trim();
-						const newId = newIdRaw.split( /\s+/ ).filter( ( token ) => /^\d+$/.test( token ) )[ 0 ];
-						if ( newId ) {
-							oldIdToNewId[ Number( t.term_id ) ] = newId;
-							// term meta を復元する（meta は元の値を再投入）。
-							if ( Array.isArray( meta ) ) {
-								for ( const m of meta ) {
-									if ( m && m.meta_key ) {
-										try {
-											wpCli( [
-												'term',
-												'meta',
-												'add',
-												newId,
-												String( m.meta_key ),
-												String( m.meta_value !== undefined ? m.meta_value : '' ),
-											] );
-										} catch ( err ) {
-											// meta 復元失敗もエラー集約に含める（後続の他 meta 復元は継続）。
-											restorationErrors.push(
-												`term meta restore failed for "${ t.slug || t.name }" (key=${ m.meta_key }): ${ err.message }`
-											);
-										}
-									}
-								}
-							}
-						} else {
-							// --porcelain で新 ID が拾えなかったケースもエラーとして記録。
-							restorationErrors.push(
-								`term restore failed for "${ t.slug || t.name }": no new term_id returned`
-							);
-						}
-					} catch ( err ) {
-						// term create に失敗した場合はエラー集約に追加し、他 term の復元は継続。
-						restorationErrors.push(
-							`term restore failed for "${ t.slug || t.name }": ${ err.message }`
-						);
-					}
-					// 成功・失敗にかかわらず、当該 term は今イテレーションで処理済みとして remaining から外す。
-					// （失敗したものを次イテレーションで再試行しても親解決が進まないため、無限ループを防ぐ）。
-					remaining.splice( i, 1 );
-					progressed = true;
-				}
-			}
-
-			// ループが進まなくなった時点で remaining に残っているものは、
-			// 親 term の new ID が解決できなかった孤立 term（親 term の create が失敗していたケース）。
-			if ( remaining.length > 0 ) {
-				for ( const orphan of remaining ) {
-					const t = orphan.term;
-					restorationErrors.push(
-						`term restore skipped (orphan, parent unresolved) for "${ t.slug || t.name }"`
-					);
-				}
-			}
-
-			// 原例外と復元エラーの両方がある場合は AggregateError でまとめて throw し、
-			// 原例外を上書きせず両方の情報を保持する。
-			// 片方しかない場合はそのまま throw する。
-			if ( originalError && restorationErrors.length > 0 ) {
-				throw new AggregateError(
-					[ originalError, new Error( restorationErrors.join( '\n' ) ) ],
-					'Test failed and term restoration also failed'
-				);
-			} else if ( originalError ) {
-				throw originalError;
-			} else if ( restorationErrors.length > 0 ) {
-				throw new Error( restorationErrors.join( '\n' ) );
-			}
+			// 後続テストへの影響を避けるため、cookie を確実に削除する。
+			// clearCookies は context 全体の cookie を消すが、このテスト内で使う cookie は
+			// 上で付与した bvsl_e2e_force_no_terms とログインセッションのみで、
+			// テスト関数のスコープ終了とともに使い捨てになるため安全。
+			await page.context().clearCookies();
 		}
 	} );
 
