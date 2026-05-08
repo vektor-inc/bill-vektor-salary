@@ -1,5 +1,5 @@
 const { test, expect } = require( '@playwright/test' );
-const { execSync } = require( 'child_process' );
+const { execFileSync } = require( 'child_process' );
 
 /**
  * PR #48: 給与テンプレート機能 + 一括登録 機能の e2e テスト（仕様変更後）。
@@ -28,6 +28,11 @@ const { execSync } = require( 'child_process' );
  *   11. デグレ: 既存給与明細の編集画面で salary_staff やメタボックスが正常に表示されること。
  */
 
+// このテスト spec で作る fixture を識別するための meta キー / 値。
+// 並列実行や他 spec との衝突を避けるため、purge 時にこの識別子で限定削除する。
+const FIXTURE_META_KEY = '_e2e_fixture';
+const FIXTURE_META_VALUE = 'salary-template-spec';
+
 // admin としてログインする共通処理。
 async function loginAsAdmin( page ) {
 	await page.goto( '/wp-login.php' );
@@ -49,39 +54,144 @@ async function loginAsSalaryEditor( page ) {
 // wp-cli を経由して shell コマンドを叩くヘルパ。
 // テスト前後のデータ整備（テスト固有の salary / template の掃除と作成）に限定して使う。
 // `wp db import / reset / export` は使わない（プロジェクトルールで禁止）。
-function wpCli( args ) {
-	return execSync( `npx wp-env run cli wp ${ args }`, { encoding: 'utf8' } );
+//
+// セキュリティ対策として、引数は文字列ではなくトークン配列で受け取り、
+// `execFileSync` で実行する（`execSync` だとシェルが介在し、コマンドインジェクションの
+// 余地が生まれるため）。`npx wp-env run cli wp ...` の構造は維持する。
+//
+// @param {string[]} argsArray - wp の後ろに渡す引数のトークン配列。例: ['post', 'list', '--post_type=salary']
+// @return {string} stdout の文字列。
+function wpCli( argsArray ) {
+	if ( ! Array.isArray( argsArray ) ) {
+		throw new TypeError( 'wpCli: argsArray must be an array of tokens' );
+	}
+	return execFileSync(
+		'npx',
+		[ 'wp-env', 'run', 'cli', 'wp', ...argsArray ],
+		{ encoding: 'utf8' }
+	);
 }
 
-// post_type を指定して、その post_type の投稿を全削除する。
-function purgePostType( postType ) {
-	const ids = wpCli( `post list --post_type=${ postType } --format=ids --posts_per_page=-1` )
+// wp-cli の出力には wp-env のプログレス行（ℹ Starting... / ✔ Ran...）や JSON 本体の前後に
+// 余分な装飾行が混じることがあるため、JSON.parse 前に正規化するヘルパー。
+//
+// @param {string} raw - wpCli の生出力。
+// @param {*} fallback - parse に失敗したときに返すフォールバック値。
+// @return {*} parse 成功時はその値、失敗時は fallback。
+function parseWpJson( raw, fallback ) {
+	const normalized = raw
+		// 行頭のプログレス/完了マーク行（ℹ / ✔）を除去。
+		.replace( /ℹ.*$/gm, '' )
+		.replace( /✔.*$/gm, '' )
+		// JSON 本体（[ または { で始まる）が現れるまでの先頭ノイズを削除。
+		.replace( /^[^[{]*/s, '' )
+		.trim();
+	try {
+		return JSON.parse( normalized );
+	} catch {
+		return fallback;
+	}
+}
+
+// 指定した post_type の中から、fixture meta が一致する投稿のみを削除する。
+// 並列実行や他 spec との干渉を避けるため、テスト spec が作った fixture だけに削除対象を絞る。
+//
+// @param {string} postType - 対象の post_type。
+// @param {Object} options - { metaKey, metaValue } で fixture 識別子を指定する。
+function purgePostFixtures( postType, { metaKey, metaValue } ) {
+	// meta_key / meta_value で絞り込んで ID 一覧を取得する。
+	const idsRaw = wpCli( [
+		'post',
+		'list',
+		`--post_type=${ postType }`,
+		'--post_status=any',
+		'--posts_per_page=-1',
+		`--meta_key=${ metaKey }`,
+		`--meta_value=${ metaValue }`,
+		'--format=ids',
+	] );
+	// wp-cli は時々プログレスやチェックマーク行を混ぜるので、ID 列のみ抽出する。
+	const ids = idsRaw
 		.replace( /ℹ.*\n/g, '' )
 		.replace( /✔.*$/m, '' )
-		.trim();
-	if ( ids ) {
-		// IDs はスペース区切りで返るため、そのまま渡せる。
-		wpCli( `post delete ${ ids } --force` );
+		.trim()
+		.split( /\s+/ )
+		.filter( ( token ) => /^\d+$/.test( token ) );
+	if ( ids.length > 0 ) {
+		// IDs はトークンとして個別に渡す（execFileSync ではシェル展開されないため）。
+		wpCli( [ 'post', 'delete', ...ids, '--force' ] );
+	}
+}
+
+// 本 spec が作るテンプレートの post_title 一覧。
+// 旧仕様で fixture meta なしのまま作られた post（本 spec の旧バージョンや手動の残骸）が
+// 残っていると、test 02 などで同タイトル投稿が複数 hit して strict mode violation を起こす。
+// そのため、setupTestData では本 spec 専用タイトルの旧残骸も併せて掃除する。
+const FIXTURE_TEMPLATE_TITLES = [
+	'麗美標準テンプレA',
+	'麗美標準テンプレB',
+	'麗美未設定テンプレ',
+];
+
+// 指定した post_type の中から、本 spec 専用タイトルに一致するが fixture meta が付いていない
+// 旧残骸 post を削除する。これは本 spec 自身が過去に作ったが識別子付与前に作られたデータの
+// マイグレーション目的で、他 spec が独自に作るタイトルには影響しない（タイトルが本 spec 専用のため）。
+//
+// @param {string} postType - 対象の post_type。
+// @param {string[]} titles - 削除候補のタイトル一覧。
+function purgeLegacyTitledPosts( postType, titles ) {
+	for ( const title of titles ) {
+		// 同タイトルの post 一覧を ID 形式で取得（fixture meta の有無に関係なく取得）。
+		const idsRaw = wpCli( [
+			'post',
+			'list',
+			`--post_type=${ postType }`,
+			'--post_status=any',
+			'--posts_per_page=-1',
+			`--title=${ title }`,
+			'--format=ids',
+		] );
+		const ids = idsRaw
+			.replace( /ℹ.*\n/g, '' )
+			.replace( /✔.*$/m, '' )
+			.trim()
+			.split( /\s+/ )
+			.filter( ( token ) => /^\d+$/.test( token ) );
+		if ( ids.length > 0 ) {
+			wpCli( [ 'post', 'delete', ...ids, '--force' ] );
+		}
 	}
 }
 
 // 既存テストデータを掃除し、新仕様で必要な状態を作る。
-//   - テスト用に作っていた salary と salary-template を全削除（force）。
+//   - 本 spec が作った fixture（meta `_e2e_fixture` = `salary-template-spec`）の salary / salary-template のみ削除。
+//   - 本 spec 専用タイトル（FIXTURE_TEMPLATE_TITLES）の旧残骸も併せて削除（マイグレーション）。
 //   - スタッフ A / B / C と salary-term 「2026年5月分」「2026年6月分」は前提として残す。
 //   - 「麗美標準テンプレ（スタッフA向け）」「麗美標準テンプレB（スタッフB向け）」「麗美未設定テンプレ（スタッフ未選択）」を
-//     新規作成し、それぞれ salary_staff メタを設定する。
+//     新規作成し、それぞれ fixture meta と salary_staff メタを設定する。
 function setupTestData() {
-	// 旧テストで残った salary を全削除（trash → force）。
-	purgePostType( 'salary' );
-	// 旧テストで残った salary-template を全削除。
-	purgePostType( 'salary-template' );
+	// 本 spec の fixture meta が付いた salary / salary-template を掃除する。
+	// 他の spec や手動作成データは削除しない（並列実行・マルチ spec 干渉を回避）。
+	purgePostFixtures( 'salary', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
+	purgePostFixtures( 'salary-template', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
+
+	// 本 spec 専用タイトルで作られた fixture meta なしの旧残骸 post も併せて削除。
+	// 旧バージョンの本 spec が作って残っていたデータが test 02 等の同タイトル多重 hit を
+	// 引き起こすのを防ぐ。タイトルは本 spec 専用のため、他 spec への影響なし。
+	purgeLegacyTitledPosts( 'salary-template', FIXTURE_TEMPLATE_TITLES );
 
 	// スタッフ A / B の ID を取得（CLI の出力からフィルタ）。
 	function getStaffIdByTitle( title ) {
 		// post list の出力にはアイコン付きのプログレス行が混じるので、ID 行のみ抽出する。
-		const out = wpCli(
-			`post list --post_type=staff --post_status=publish --posts_per_page=-1 --format=csv --fields=ID,post_title`
-		);
+		const out = wpCli( [
+			'post',
+			'list',
+			'--post_type=staff',
+			'--post_status=publish',
+			'--posts_per_page=-1',
+			'--format=csv',
+			'--fields=ID,post_title',
+		] );
 		const lines = out.split( '\n' );
 		for ( const line of lines ) {
 			// 形式: ID,post_title
@@ -96,25 +206,44 @@ function setupTestData() {
 	const staffB = getStaffIdByTitle( '麗美テストスタッフB' );
 
 	// 「麗美標準テンプレ（スタッフA）」: スタッフあり。
-	const tplA = wpCli(
-		`post create --post_type=salary-template --post_status=publish --post_title=麗美標準テンプレA --porcelain`
-	).trim();
-	wpCli( `post meta update ${ tplA } salary_staff ${ staffA }` );
-	wpCli( `post meta update ${ tplA } salary_staff_number 001` );
-	wpCli( `post meta update ${ tplA } salary_base 300000` );
+	const tplA = wpCli( [
+		'post',
+		'create',
+		'--post_type=salary-template',
+		'--post_status=publish',
+		'--post_title=麗美標準テンプレA',
+		'--porcelain',
+	] ).trim();
+	// fixture 識別子を付与（後続の purge 対象に含めるため）。
+	wpCli( [ 'post', 'meta', 'update', tplA, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
+	wpCli( [ 'post', 'meta', 'update', tplA, 'salary_staff', staffA ] );
+	wpCli( [ 'post', 'meta', 'update', tplA, 'salary_staff_number', '001' ] );
+	wpCli( [ 'post', 'meta', 'update', tplA, 'salary_base', '300000' ] );
 
 	// 「麗美標準テンプレB（スタッフB）」: スタッフあり。
-	const tplB = wpCli(
-		`post create --post_type=salary-template --post_status=publish --post_title=麗美標準テンプレB --porcelain`
-	).trim();
-	wpCli( `post meta update ${ tplB } salary_staff ${ staffB }` );
-	wpCli( `post meta update ${ tplB } salary_staff_number 002` );
-	wpCli( `post meta update ${ tplB } salary_base 280000` );
+	const tplB = wpCli( [
+		'post',
+		'create',
+		'--post_type=salary-template',
+		'--post_status=publish',
+		'--post_title=麗美標準テンプレB',
+		'--porcelain',
+	] ).trim();
+	wpCli( [ 'post', 'meta', 'update', tplB, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
+	wpCli( [ 'post', 'meta', 'update', tplB, 'salary_staff', staffB ] );
+	wpCli( [ 'post', 'meta', 'update', tplB, 'salary_staff_number', '002' ] );
+	wpCli( [ 'post', 'meta', 'update', tplB, 'salary_base', '280000' ] );
 
 	// 「麗美未設定テンプレ」: スタッフ未設定（salary_staff メタを設定しない）。
-	wpCli(
-		`post create --post_type=salary-template --post_status=publish --post_title=麗美未設定テンプレ --porcelain`
-	).trim();
+	const tplC = wpCli( [
+		'post',
+		'create',
+		'--post_type=salary-template',
+		'--post_status=publish',
+		'--post_title=麗美未設定テンプレ',
+		'--porcelain',
+	] ).trim();
+	wpCli( [ 'post', 'meta', 'update', tplC, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 
 	return { tplA, tplB };
 }
@@ -335,8 +464,8 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 	} );
 
 	test( '08-a. 0 件時: テンプレ未作成 → 「給与テンプレートを作成」遷移ボタン表示', async ( { page } ) => {
-		// 一時的にテンプレを全削除する。
-		purgePostType( 'salary-template' );
+		// 一時的に本 spec の fixture テンプレのみ削除する（他 spec への干渉を避けるため）。
+		purgePostFixtures( 'salary-template', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
 
 		try {
 			await loginAsAdmin( page );
@@ -368,22 +497,69 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 	} );
 
 	test( '08-b. 0 件時: 支給分未登録 → 「支給分を登録する」遷移ボタン表示', async ( { page } ) => {
-		// 支給分タームを一時退避（削除）して、復元用に名前を保持する。
-		const csv = wpCli( 'term list salary-term --format=csv --fields=term_id,name' );
-		const termNames = [];
-		const termIdList = [];
-		csv.split( '\n' ).forEach( ( line ) => {
-			const cols = line.split( ',' );
-			// 数字 ID で始まる行のみ採用（progress 行や header をスキップ）。
-			if ( cols.length >= 2 && /^\d+$/.test( cols[ 0 ] ) ) {
-				termIdList.push( cols[ 0 ] );
-				termNames.push( { id: cols[ 0 ], name: cols[ 1 ] } );
+		// 支給分タームを完全な属性付きで退避し、復元時に元の状態を再現する。
+		// 退避内容:
+		//   - term の全フィールド（name / slug / description / parent / 元の term_id）
+		//   - term meta（key / value 一覧）
+		// 注意: term を delete → create で作り直すと term_id は変わるため、
+		//      term_id 依存のリレーション（postmeta 等）があるテストでは別途注意が必要。
+		//      このテストでは復元直後にテストが終了し、削除中の期間も他データに影響しないため、
+		//      ID 変動は許容する。
+
+		// 1) 全 term の term_id 一覧を取得。
+		const termIdsRaw = wpCli( [
+			'term',
+			'list',
+			'salary-term',
+			'--format=ids',
+		] );
+		const termIds = termIdsRaw
+			.trim()
+			.split( /\s+/ )
+			.filter( ( token ) => /^\d+$/.test( token ) );
+
+		// 2) 各 term の全データと term meta を JSON で退避。
+		// 形式: [{ term: { name, slug, description, parent, term_id, ... }, meta: [{ meta_key, meta_value }, ...] }, ...]
+		const termBackups = [];
+		for ( const tid of termIds ) {
+			// term 本体の全フィールド取得（parseWpJson で wp-env のプログレス行を除去してから parse）。
+			const termJsonRaw = wpCli( [
+				'term',
+				'get',
+				'salary-term',
+				tid,
+				'--format=json',
+			] );
+			const termData = parseWpJson( termJsonRaw, null );
+
+			// term meta 一覧の取得（同様に parseWpJson で正規化）。
+			const metaJsonRaw = wpCli( [
+				'term',
+				'meta',
+				'list',
+				tid,
+				'--format=json',
+			] );
+			const metaParsed = parseWpJson( metaJsonRaw, [] );
+			const metaList = Array.isArray( metaParsed ) ? metaParsed : [];
+
+			if ( termData ) {
+				termBackups.push( { term: termData, meta: metaList } );
 			}
-		} );
-		if ( termIdList.length > 0 ) {
-			wpCli( `term delete salary-term ${ termIdList.join( ' ' ) }` );
 		}
 
+		// 3) すべての term を削除。
+		// TODO(#56): salary-term の taxonomy 全削除は、共有 wp-env で他 spec / 他 worker
+		// から「削除中の窓」で 0 件に見える時間が発生するため、本 spec を専用 wp-env / DB に分離するか、
+		// test 08-b の設計を見直す必要がある。本 PR スコープ外として別 issue で対応。
+		if ( termIds.length > 0 ) {
+			wpCli( [ 'term', 'delete', 'salary-term', ...termIds ] );
+		}
+
+		// テスト本体で発生した原例外を保持し、finally の throw による上書きを避ける。
+		// finally の term 復元が失敗した場合は、原例外と復元失敗を AggregateError でまとめて throw し、
+		// 両方の情報を呼び出し側（Playwright のレポート）に伝える。
+		let originalError;
 		try {
 			await loginAsAdmin( page );
 			await page.goto( '/wp-admin/edit.php?post_type=salary' );
@@ -404,14 +580,126 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			await expect( panel.locator( '#bvsl-bulk-term' ) ).toHaveCount( 0 );
 
 			await page.screenshot( { path: 'tests/e2e/screenshots/pr48/08b-no-terms.png', fullPage: true } );
+		} catch ( err ) {
+			// 原例外を保持。再 throw は finally で AggregateError / そのまま throw のいずれかに分岐する。
+			originalError = err;
 		} finally {
-			// ターム復元。
-			for ( const t of termNames ) {
-				try {
-					wpCli( `term create salary-term "${ t.name }"` );
-				} catch ( e ) {
-					// 既に存在していたらスキップ。
+			// 4) ターム復元: iterative restore で多階層（孫世代以降）にも対応する。
+			// 元の term_id → 新しい term_id のマッピング（parent 復元用）。
+			const oldIdToNewId = {};
+			// 復元中のエラーを集約し、finally の最後にまとめて throw する。
+			// 個別の catch でログを出すだけだとテストが silently に「成功扱い」になり、
+			// 退避データが欠損したまま後続テストに影響するため、最後に必ず可視化する。
+			const restorationErrors = [];
+
+			// iterative restore: 各イテレーションで「未作成かつ親が解決済み（または root）」の term を作成し、
+			// progressed フラグで打ち切り判定する。これにより、2 パス方式では拾えない多階層
+			// （root → 子 → 孫）の階層も、親が作成された次のイテレーションで子・孫と順番に解決できる。
+			const remaining = termBackups.map( ( backup ) => ( {
+				term: backup.term,
+				meta: backup.meta,
+			} ) );
+			let progressed = true;
+			while ( progressed && remaining.length > 0 ) {
+				progressed = false;
+				// 配列途中で削除するため、後ろから走査する。
+				for ( let i = remaining.length - 1; i >= 0; i-- ) {
+					const t = remaining[ i ].term;
+					const meta = remaining[ i ].meta;
+					const parentOldId = Number( t.parent || 0 );
+					// root（parent=0）か、親が既に解決済みのものだけを今回のイテレーションで処理する。
+					if ( parentOldId !== 0 && oldIdToNewId[ parentOldId ] === undefined ) {
+						continue;
+					}
+
+					const createArgs = [
+						'term',
+						'create',
+						'salary-term',
+						String( t.name || '' ),
+					];
+					if ( t.slug ) {
+						createArgs.push( `--slug=${ t.slug }` );
+					}
+					if ( t.description ) {
+						createArgs.push( `--description=${ t.description }` );
+					}
+					// parent は元の term_id を新しい term_id に解決して指定する。
+					if ( parentOldId !== 0 ) {
+						createArgs.push( `--parent=${ oldIdToNewId[ parentOldId ] }` );
+					}
+					// --porcelain で再作成後の term_id を取得し、ID 解決マップに入れる。
+					createArgs.push( '--porcelain' );
+
+					try {
+						const newIdRaw = wpCli( createArgs ).trim();
+						const newId = newIdRaw.split( /\s+/ ).filter( ( token ) => /^\d+$/.test( token ) )[ 0 ];
+						if ( newId ) {
+							oldIdToNewId[ Number( t.term_id ) ] = newId;
+							// term meta を復元する（meta は元の値を再投入）。
+							if ( Array.isArray( meta ) ) {
+								for ( const m of meta ) {
+									if ( m && m.meta_key ) {
+										try {
+											wpCli( [
+												'term',
+												'meta',
+												'add',
+												newId,
+												String( m.meta_key ),
+												String( m.meta_value !== undefined ? m.meta_value : '' ),
+											] );
+										} catch ( err ) {
+											// meta 復元失敗もエラー集約に含める（後続の他 meta 復元は継続）。
+											restorationErrors.push(
+												`term meta restore failed for "${ t.slug || t.name }" (key=${ m.meta_key }): ${ err.message }`
+											);
+										}
+									}
+								}
+							}
+						} else {
+							// --porcelain で新 ID が拾えなかったケースもエラーとして記録。
+							restorationErrors.push(
+								`term restore failed for "${ t.slug || t.name }": no new term_id returned`
+							);
+						}
+					} catch ( err ) {
+						// term create に失敗した場合はエラー集約に追加し、他 term の復元は継続。
+						restorationErrors.push(
+							`term restore failed for "${ t.slug || t.name }": ${ err.message }`
+						);
+					}
+					// 成功・失敗にかかわらず、当該 term は今イテレーションで処理済みとして remaining から外す。
+					// （失敗したものを次イテレーションで再試行しても親解決が進まないため、無限ループを防ぐ）。
+					remaining.splice( i, 1 );
+					progressed = true;
 				}
+			}
+
+			// ループが進まなくなった時点で remaining に残っているものは、
+			// 親 term の new ID が解決できなかった孤立 term（親 term の create が失敗していたケース）。
+			if ( remaining.length > 0 ) {
+				for ( const orphan of remaining ) {
+					const t = orphan.term;
+					restorationErrors.push(
+						`term restore skipped (orphan, parent unresolved) for "${ t.slug || t.name }"`
+					);
+				}
+			}
+
+			// 原例外と復元エラーの両方がある場合は AggregateError でまとめて throw し、
+			// 原例外を上書きせず両方の情報を保持する。
+			// 片方しかない場合はそのまま throw する。
+			if ( originalError && restorationErrors.length > 0 ) {
+				throw new AggregateError(
+					[ originalError, new Error( restorationErrors.join( '\n' ) ) ],
+					'Test failed and term restoration also failed'
+				);
+			} else if ( originalError ) {
+				throw originalError;
+			} else if ( restorationErrors.length > 0 ) {
+				throw new Error( restorationErrors.join( '\n' ) );
 			}
 		}
 	} );
@@ -462,9 +750,15 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 	test( '11. デグレ: 既存給与明細の編集画面でメタボックス・PDF/メール履歴 UI が正常表示', async ( { page } ) => {
 		// 08-a / 08-b の影響で salary が空になっている可能性があるため、
 		// このテスト用に 1 件作って編集画面で確認する。
-		const staffOut = wpCli(
-			'post list --post_type=staff --post_status=publish --posts_per_page=1 --format=csv --fields=ID'
-		);
+		const staffOut = wpCli( [
+			'post',
+			'list',
+			'--post_type=staff',
+			'--post_status=publish',
+			'--posts_per_page=1',
+			'--format=csv',
+			'--fields=ID',
+		] );
 		let staffId = '';
 		staffOut.split( '\n' ).forEach( ( line ) => {
 			if ( /^\d+$/.test( line.trim() ) ) {
@@ -473,10 +767,17 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		} );
 		expect( staffId, 'スタッフが 1 件以上登録されている' ).not.toBe( '' );
 
-		const salaryId = wpCli(
-			`post create --post_type=salary --post_status=draft --post_title=デグレ確認用 --porcelain`
-		).trim().split( '\n' ).filter( ( l ) => /^\d+$/.test( l.trim() ) )[ 0 ];
-		wpCli( `post meta update ${ salaryId } salary_staff ${ staffId }` );
+		const salaryId = wpCli( [
+			'post',
+			'create',
+			'--post_type=salary',
+			'--post_status=draft',
+			'--post_title=デグレ確認用',
+			'--porcelain',
+		] ).trim().split( '\n' ).filter( ( l ) => /^\d+$/.test( l.trim() ) )[ 0 ];
+		// fixture 識別子を付与（後続 spec の purge 対象に含めるため）。
+		wpCli( [ 'post', 'meta', 'update', salaryId, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
+		wpCli( [ 'post', 'meta', 'update', salaryId, 'salary_staff', staffId ] );
 
 		try {
 			await loginAsAdmin( page );
@@ -506,7 +807,7 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			await page.screenshot( { path: 'tests/e2e/screenshots/pr48/11-salary-edit.png', fullPage: true } );
 		} finally {
 			// テスト用 salary を削除。
-			wpCli( `post delete ${ salaryId } --force` );
+			wpCli( [ 'post', 'delete', salaryId, '--force' ] );
 		}
 	} );
 } );
