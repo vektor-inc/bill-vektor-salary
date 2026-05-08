@@ -51,8 +51,7 @@ if ( empty( $_COOKIE['bvsl_e2e_force_no_terms'] ) || '1' !== (string) wp_unslash
 add_filter(
 	'bvsl_bulk_create_panel_terms',
 	static function ( $terms ) {
-		// 元の $terms は意図的に破棄。0 件状態を強制的に再現する。
-		unset( $terms );
+		// 0 件状態を強制的に再現する（元の $terms は無視）。
 		return array();
 	}
 );
