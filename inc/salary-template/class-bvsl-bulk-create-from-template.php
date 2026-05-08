@@ -76,15 +76,23 @@ class BVSL_Bulk_Create_From_Template {
 	/**
 	 * 一括登録パネル用の CSS / JS を読み込む。
 	 *
-	 * 給与明細（salary）一覧画面（hook_suffix: edit-salary）でのみ読み込む。
+	 * 給与明細（salary）一覧画面でのみ読み込む。
+	 * admin_enqueue_scripts に渡される $hook_suffix は pagenow ベース（'edit.php' など）で、
+	 * post_type の情報を含まないため、現在のスクリーン ID（'edit-salary'）でも判定する。
 	 * ファイルの更新時刻をバージョンに使うことで、ブラウザキャッシュの破棄を自動化する。
 	 *
-	 * @param string $hook_suffix 現在の管理画面の hook suffix。
+	 * @param string $hook_suffix 現在の管理画面の hook suffix（'edit.php' など）。
 	 * @return void
 	 */
 	public static function enqueue_assets( $hook_suffix ) {
-		// 給与明細一覧画面（edit.php?post_type=salary）の hook suffix のみ対象。
-		if ( 'edit-salary' !== $hook_suffix ) {
+		// 投稿一覧系の画面（edit.php）以外は早期 return。
+		if ( 'edit.php' !== $hook_suffix ) {
+			return;
+		}
+		// $hook_suffix は post_type を区別しないため、スクリーン ID で salary 一覧かどうか判定する。
+		// admin_enqueue_scripts は current_screen フック以降に発火するため get_current_screen() が利用可能。
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-salary' !== $screen->id ) {
 			return;
 		}
 		// 念のため画面判定でもガード（権限のないユーザーには読ませない）。
