@@ -3,12 +3,12 @@
  * 給与テンプレートからの一括登録クラス。
  *
  * 給与明細（salary）一覧画面の上部に折りたたみ可能なパネルを描画し、
- * **支給分（salary-term）を 1 つ指定すると、公開状態の給与テンプレ全件** を
+ * **支給分（salary-term）を 1 つ指定すると、処理対象の給与テンプレ全件**（公開 / 非公開、下書きは除外）を
  * 各スタッフ向けの salary 投稿として下書きで一括生成する。
  *
  * 運用イメージ:
  * - 給与テンプレートはスタッフごとに作成する雛形。
- * - 毎月（支給分ごとに）一括登録パネルで支給分を選んで実行 → 公開テンプレ全件が salary に展開される。
+ * - 毎月（支給分ごとに）一括登録パネルで支給分を選んで実行 → 処理対象の給与テンプレ全件が salary に展開される。
  * - vk-booking-manager-pro の class-shift-editor.php の bulk_create パターンに揃えた、
  *   「テンプレ全件を支給分指定で一気に展開する」シンプルな運用。
  *
@@ -38,10 +38,10 @@ class BVSL_Bulk_Create_From_Template {
 	const NONCE_NAME = '_bvsl_bulk_create_nonce';
 
 	/**
-	 * 1 リクエストで処理できる公開テンプレ数の上限。
+	 * 1 リクエストで処理できる対象テンプレ数の上限。
 	 *
 	 * 大量生成による負荷・誤操作の被害範囲を抑える保険。
-	 * 公開状態の給与テンプレが上限を超える場合は admin notice でエラー表示して拒否する。
+	 * 処理対象の給与テンプレ（公開 / 非公開）が上限を超える場合は admin notice でエラー表示して拒否する。
 	 */
 	const MAX_TEMPLATE_COUNT = 500;
 
@@ -131,8 +131,9 @@ class BVSL_Bulk_Create_From_Template {
 		);
 
 		// 旧インラインスクリプトで PHP から JS に渡していた値を localize で渡す。
-		// 公開テンプレ件数はパネル描画時に確定するため、ここでも同じ取得関数を使う。
-		$template_count = count( self::get_target_templates() );
+		// 対象テンプレ件数はパネル描画時に確定するため、軽量な wp_count_posts() ベースのヘルパーで件数のみ取得する
+		// （実配列が不要な箇所では get_posts() で全件ロードしないように切り替えた）。
+		$template_count = self::get_target_template_count();
 		wp_localize_script(
 			'bvsl-admin-bulk-create-panel',
 			'bvslBulkCreatePanel',
@@ -140,8 +141,8 @@ class BVSL_Bulk_Create_From_Template {
 				'templateCount' => $template_count,
 				'i18n'          => array(
 					'selectTerm' => __( '支給分を選んでください。', 'bill-vektor-salary' ),
-					'summary'    => __( '公開中のテンプレート %1$d 件を「%2$s」で下書き作成します。', 'bill-vektor-salary' ),
-					'confirm'    => __( '公開中のテンプレート %1$d 件を「%2$s」で下書き作成します。よろしいですか？', 'bill-vektor-salary' ),
+					'summary'    => __( '対象テンプレート %1$d 件を「%2$s」で下書き作成します。', 'bill-vektor-salary' ),
+					'confirm'    => __( '対象テンプレート %1$d 件を「%2$s」で下書き作成します。よろしいですか？', 'bill-vektor-salary' ),
 				),
 			)
 		);
@@ -179,7 +180,7 @@ class BVSL_Bulk_Create_From_Template {
 	/**
 	 * 一括登録の処理対象になる給与テンプレ投稿一覧を取得する。
 	 *
-	 * 公開状態（publish / private）のテンプレのみが処理対象。
+	 * 公開（publish）/ 非公開（private）のテンプレが処理対象。
 	 * draft のテンプレは未完成として誤配リスクがあるため除外する。
 	 *
 	 * @return WP_Post[] 給与テンプレ投稿の配列。
@@ -194,6 +195,29 @@ class BVSL_Bulk_Create_From_Template {
 				'order'          => 'ASC',
 			)
 		);
+	}
+
+	/**
+	 * 一括登録の処理対象（公開 / 非公開）の給与テンプレ件数のみを軽量に取得する。
+	 *
+	 * 件数だけが欲しい箇所（パネル描画・JS への localize）で get_target_templates() を呼ぶと
+	 * WP_Post 全件をメモリにロードしてしまうため、wp_count_posts() の集計値だけを使う。
+	 * wp_count_posts() の戻り値は post_status をプロパティに持つ stdClass で、
+	 * 該当 status が 0 件のときは publish / private プロパティが未定義になりうるため
+	 * isset チェック + (int) キャストで防御する。
+	 *
+	 * @return int publish + private の合計件数。
+	 */
+	private static function get_target_template_count() {
+		$counts = wp_count_posts( 'salary-template' );
+		// wp_count_posts は通常 stdClass を返すが、想定外の戻り値（false など）に備えて型ガード。
+		if ( ! is_object( $counts ) ) {
+			return 0;
+		}
+		// publish / private が未定義のケースに備えて isset チェック + キャスト。
+		$publish = isset( $counts->publish ) ? (int) $counts->publish : 0;
+		$private = isset( $counts->private ) ? (int) $counts->private : 0;
+		return $publish + $private;
 	}
 
 	/**
@@ -231,11 +255,12 @@ class BVSL_Bulk_Create_From_Template {
 			return;
 		}
 
-		$templates      = self::get_target_templates();
+		// パネル描画では実配列を使わないため、wp_count_posts() ベースの軽量カウントのみで判定する。
+		// 実配列が必要なのは admin-post の handle() だけ。
 		$terms          = self::get_salary_terms();
-		$has_templates  = ! empty( $templates );
+		$template_count = self::get_target_template_count();
+		$has_templates  = $template_count > 0;
 		$has_terms      = ! empty( $terms );
-		$template_count = count( $templates );
 
 		// 折りたたみ状態の判定:
 		// - 結果 transient があるとき（直近の操作結果を見せる）
@@ -277,8 +302,8 @@ class BVSL_Bulk_Create_From_Template {
 					<p class="bvsl-bulk-create__lead">
 						<?php
 						printf(
-							/* translators: %d: 公開中の給与テンプレ件数 */
-							esc_html__( '公開中の給与テンプレートは %d 件です。指定した支給分でこの全件を給与明細（下書き）として一括展開します。', 'bill-vektor-salary' ),
+							/* translators: %d: 一括展開の対象となる給与テンプレ件数（公開・非公開を含み、下書きは除外） */
+							esc_html__( '一括展開の対象となる給与テンプレートは %d 件です（公開・非公開を含み、下書きは除外）。指定した支給分で全件を給与明細（下書き）として展開します。', 'bill-vektor-salary' ),
 							(int) $template_count
 						);
 						?>
@@ -314,7 +339,7 @@ class BVSL_Bulk_Create_From_Template {
 										<p class="bvsl-bulk-create__warning">
 											<?php
 											printf(
-												/* translators: 1: 上限件数 2: 公開中テンプレ件数 */
+												/* translators: 1: 上限件数 2: 対象の給与テンプレ件数 */
 												esc_html__( '一度に処理できるテンプレートは最大 %1$d 件までです（現在 %2$d 件）。', 'bill-vektor-salary' ),
 												(int) self::MAX_TEMPLATE_COUNT,
 												(int) $template_count
@@ -343,7 +368,7 @@ class BVSL_Bulk_Create_From_Template {
 	/**
 	 * 一括登録の admin-post ハンドラ。
 	 *
-	 * 入力検証 → 件数上限チェック → 公開テンプレ全件をループしながら
+	 * 入力検証 → 件数上限チェック → 処理対象テンプレ（公開 / 非公開）全件をループしながら
 	 * 各テンプレを bill_copy_post で salary に複製 → スタッフ・支給分メタを上書き → タイトル整形。
 	 * スキップ理由は重複・スタッフ未設定の 2 種類で分けてカウントする。
 	 * 結果は transient に格納し、リダイレクト先で表示・削除する。
@@ -379,7 +404,8 @@ class BVSL_Bulk_Create_From_Template {
 			exit;
 		}
 
-		// 公開テンプレを全件取得。
+		// 処理対象テンプレ（公開 / 非公開）を全件取得。
+		// ここはループで実体（WP_Post）が必要なので wp_count_posts() ベースのカウントには置き換えない。
 		$templates = self::get_target_templates();
 		if ( empty( $templates ) ) {
 			self::store_result( array( 'error' => 'no_templates' ) );
@@ -387,7 +413,7 @@ class BVSL_Bulk_Create_From_Template {
 			exit;
 		}
 
-		// 件数上限チェック（公開テンプレ件数で判定）。
+		// 件数上限チェック（対象テンプレ件数で判定）。
 		if ( count( $templates ) > self::MAX_TEMPLATE_COUNT ) {
 			self::store_result( array( 'error' => 'too_many_templates' ) );
 			wp_safe_redirect( $redirect_base );
@@ -574,10 +600,10 @@ class BVSL_Bulk_Create_From_Template {
 		if ( ! empty( $result['error'] ) ) {
 			$messages = array(
 				'invalid_term'       => __( '支給分が選択されていないか、無効です。', 'bill-vektor-salary' ),
-				'no_templates'       => __( '公開中の給与テンプレートが見つかりません。', 'bill-vektor-salary' ),
+				'no_templates'       => __( '対象となる給与テンプレートが見つかりません。', 'bill-vektor-salary' ),
 				'too_many_templates' => sprintf(
 					/* translators: %d: 上限件数 */
-					__( '公開中の給与テンプレートが多すぎます（上限 %d 件）。', 'bill-vektor-salary' ),
+					__( '対象テンプレートが多すぎます（上限 %d 件）。', 'bill-vektor-salary' ),
 					(int) self::MAX_TEMPLATE_COUNT
 				),
 				'no_copy_function'   => __( '親テーマ「BillVektor」が有効化されていないため、一括登録を実行できません。', 'bill-vektor-salary' ),
