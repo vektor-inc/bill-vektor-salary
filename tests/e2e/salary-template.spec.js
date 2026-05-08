@@ -556,6 +556,10 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			wpCli( [ 'term', 'delete', 'salary-term', ...termIds ] );
 		}
 
+		// テスト本体で発生した原例外を保持し、finally の throw による上書きを避ける。
+		// finally の term 復元が失敗した場合は、原例外と復元失敗を AggregateError でまとめて throw し、
+		// 両方の情報を呼び出し側（Playwright のレポート）に伝える。
+		let originalError;
 		try {
 			await loginAsAdmin( page );
 			await page.goto( '/wp-admin/edit.php?post_type=salary' );
@@ -576,8 +580,11 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			await expect( panel.locator( '#bvsl-bulk-term' ) ).toHaveCount( 0 );
 
 			await page.screenshot( { path: 'tests/e2e/screenshots/pr48/08b-no-terms.png', fullPage: true } );
+		} catch ( err ) {
+			// 原例外を保持。再 throw は finally で AggregateError / そのまま throw のいずれかに分岐する。
+			originalError = err;
 		} finally {
-			// 4) ターム復元: 親 term から先に作る（slug ベースで親 ID を引くため、まず parent=0 のものを処理）。
+			// 4) ターム復元: iterative restore で多階層（孫世代以降）にも対応する。
 			// 元の term_id → 新しい term_id のマッピング（parent 復元用）。
 			const oldIdToNewId = {};
 			// 復元中のエラーを集約し、finally の最後にまとめて throw する。
@@ -585,15 +592,26 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			// 退避データが欠損したまま後続テストに影響するため、最後に必ず可視化する。
 			const restorationErrors = [];
 
-			// 親が無い term から先に作るため、parent=0 を先に処理する 2 パスのループにする。
-			const passes = [
-				( t ) => Number( t.term.parent ) === 0 || ! t.term.parent,
-				( t ) => Number( t.term.parent ) !== 0 && t.term.parent,
-			];
+			// iterative restore: 各イテレーションで「未作成かつ親が解決済み（または root）」の term を作成し、
+			// progressed フラグで打ち切り判定する。これにより、2 パス方式では拾えない多階層
+			// （root → 子 → 孫）の階層も、親が作成された次のイテレーションで子・孫と順番に解決できる。
+			const remaining = termBackups.map( ( backup ) => ( {
+				term: backup.term,
+				meta: backup.meta,
+			} ) );
+			let progressed = true;
+			while ( progressed && remaining.length > 0 ) {
+				progressed = false;
+				// 配列途中で削除するため、後ろから走査する。
+				for ( let i = remaining.length - 1; i >= 0; i-- ) {
+					const t = remaining[ i ].term;
+					const meta = remaining[ i ].meta;
+					const parentOldId = Number( t.parent || 0 );
+					// root（parent=0）か、親が既に解決済みのものだけを今回のイテレーションで処理する。
+					if ( parentOldId !== 0 && oldIdToNewId[ parentOldId ] === undefined ) {
+						continue;
+					}
 
-			for ( const filter of passes ) {
-				for ( const backup of termBackups.filter( filter ) ) {
-					const t = backup.term;
 					const createArgs = [
 						'term',
 						'create',
@@ -607,34 +625,36 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 						createArgs.push( `--description=${ t.description }` );
 					}
 					// parent は元の term_id を新しい term_id に解決して指定する。
-					if ( t.parent && oldIdToNewId[ t.parent ] ) {
-						createArgs.push( `--parent=${ oldIdToNewId[ t.parent ] }` );
+					if ( parentOldId !== 0 ) {
+						createArgs.push( `--parent=${ oldIdToNewId[ parentOldId ] }` );
 					}
 					// --porcelain で再作成後の term_id を取得し、ID 解決マップに入れる。
 					createArgs.push( '--porcelain' );
 
 					try {
 						const newIdRaw = wpCli( createArgs ).trim();
-						const newId = newIdRaw.split( /\s+/ ).find( ( token ) => /^\d+$/.test( token ) );
+						const newId = newIdRaw.split( /\s+/ ).filter( ( token ) => /^\d+$/.test( token ) )[ 0 ];
 						if ( newId ) {
-							oldIdToNewId[ t.term_id ] = newId;
+							oldIdToNewId[ Number( t.term_id ) ] = newId;
 							// term meta を復元する（meta は元の値を再投入）。
-							for ( const m of backup.meta ) {
-								if ( m && m.meta_key ) {
-									try {
-										wpCli( [
-											'term',
-											'meta',
-											'add',
-											newId,
-											String( m.meta_key ),
-											String( m.meta_value !== undefined ? m.meta_value : '' ),
-										] );
-									} catch ( err ) {
-										// meta 復元失敗もエラー集約に含める（後続の他 meta 復元は継続）。
-										restorationErrors.push(
-											`term meta restore failed for "${ t.slug || t.name }" (key=${ m.meta_key }): ${ err.message }`
-										);
+							if ( Array.isArray( meta ) ) {
+								for ( const m of meta ) {
+									if ( m && m.meta_key ) {
+										try {
+											wpCli( [
+												'term',
+												'meta',
+												'add',
+												newId,
+												String( m.meta_key ),
+												String( m.meta_value !== undefined ? m.meta_value : '' ),
+											] );
+										} catch ( err ) {
+											// meta 復元失敗もエラー集約に含める（後続の他 meta 復元は継続）。
+											restorationErrors.push(
+												`term meta restore failed for "${ t.slug || t.name }" (key=${ m.meta_key }): ${ err.message }`
+											);
+										}
 									}
 								}
 							}
@@ -650,11 +670,35 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 							`term restore failed for "${ t.slug || t.name }": ${ err.message }`
 						);
 					}
+					// 成功・失敗にかかわらず、当該 term は今イテレーションで処理済みとして remaining から外す。
+					// （失敗したものを次イテレーションで再試行しても親解決が進まないため、無限ループを防ぐ）。
+					remaining.splice( i, 1 );
+					progressed = true;
 				}
 			}
 
-			// 復元中に発生したエラーがあれば、まとめて throw して可視化する。
-			if ( restorationErrors.length > 0 ) {
+			// ループが進まなくなった時点で remaining に残っているものは、
+			// 親 term の new ID が解決できなかった孤立 term（親 term の create が失敗していたケース）。
+			if ( remaining.length > 0 ) {
+				for ( const orphan of remaining ) {
+					const t = orphan.term;
+					restorationErrors.push(
+						`term restore skipped (orphan, parent unresolved) for "${ t.slug || t.name }"`
+					);
+				}
+			}
+
+			// 原例外と復元エラーの両方がある場合は AggregateError でまとめて throw し、
+			// 原例外を上書きせず両方の情報を保持する。
+			// 片方しかない場合はそのまま throw する。
+			if ( originalError && restorationErrors.length > 0 ) {
+				throw new AggregateError(
+					[ originalError, new Error( restorationErrors.join( '\n' ) ) ],
+					'Test failed and term restoration also failed'
+				);
+			} else if ( originalError ) {
+				throw originalError;
+			} else if ( restorationErrors.length > 0 ) {
 				throw new Error( restorationErrors.join( '\n' ) );
 			}
 		}
