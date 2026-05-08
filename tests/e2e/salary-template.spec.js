@@ -549,7 +549,7 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		}
 
 		// 3) すべての term を削除。
-		// TODO(別 issue 化予定): salary-term の taxonomy 全削除は、共有 wp-env で他 spec / 他 worker
+		// TODO(#56): salary-term の taxonomy 全削除は、共有 wp-env で他 spec / 他 worker
 		// から「削除中の窓」で 0 件に見える時間が発生するため、本 spec を専用 wp-env / DB に分離するか、
 		// test 08-b の設計を見直す必要がある。本 PR スコープ外として別 issue で対応。
 		if ( termIds.length > 0 ) {
