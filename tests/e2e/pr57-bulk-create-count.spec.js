@@ -29,6 +29,7 @@ async function loginAsAdmin( page ) {
 }
 
 // wp-cli 呼び出しヘルパ（execFileSync ベースで shell 経由を避ける）。
+// wp-env が詰まったときに worker ごと無限ハングしないよう、タイムアウト・出力上限を設定する。
 function wpCli( argsArray ) {
 	if ( ! Array.isArray( argsArray ) ) {
 		throw new TypeError( 'wpCli: argsArray must be an array of tokens' );
@@ -36,7 +37,13 @@ function wpCli( argsArray ) {
 	return execFileSync(
 		'npx',
 		[ 'wp-env', 'run', 'cli', 'wp', ...argsArray ],
-		{ encoding: 'utf8' }
+		{
+			encoding: 'utf8',
+			// 1 コマンドあたり 30 秒で打ち切り（wp-env 側のハング保険）。
+			timeout: 30000,
+			// 出力サイズ上限を明示しておく（wp post list が肥大しても暴発しないように）。
+			maxBuffer: 1024 * 1024,
+		}
 	);
 }
 
@@ -196,6 +203,11 @@ async function ensurePanelOpen( page ) {
 }
 
 test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', () => {
+	// この suite は salary-template の「全体件数（publish + private）」を 3 件、draft を 1 件と
+	// 仮定したアサートを行うため、他 spec が並列で同 post type を作ると件数が崩れる。
+	// describe 内のテストを直列化することで、suite 内の beforeEach → test の順序を保証する。
+	test.describe.configure( { mode: 'serial' } );
+
 	// fixture のセットアップに wp-cli を多数呼ぶため、テストごとのタイムアウトを延長する。
 	test.setTimeout( 180000 );
 
@@ -297,12 +309,15 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		} );
 
 		// 送信ボタンを押す。
+		// 注: クリック前の URL も `post_type=salary` を含むため、`waitForURL` を後追いで呼ぶと
+		// ナビゲーション完了を待てず素通りする。`waitForNavigation` を `Promise.all` で
+		// クリックと同時に張ってから submit する。
 		const submitBtn = page.locator( '#bvsl-bulk-submit' );
 		await expect( submitBtn ).toBeEnabled();
-		await submitBtn.click();
-
-		// リダイレクト後、結果通知が表示される。
-		await page.waitForURL( /post_type=salary/, { timeout: 30000 } );
+		await Promise.all( [
+			page.waitForNavigation( { timeout: 30000 } ),
+			submitBtn.click(),
+		] );
 
 		// publish 2 件 + private 1 件 = 3 件分の salary が draft で生成されているはず。
 		// title prefix で確認する（「PR57_Staff_X / PR57_Term_2026_05」のような形になる想定）。
