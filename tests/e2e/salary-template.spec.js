@@ -72,6 +72,27 @@ function wpCli( argsArray ) {
 	);
 }
 
+// wp-cli の出力には wp-env のプログレス行（ℹ Starting... / ✔ Ran...）や JSON 本体の前後に
+// 余分な装飾行が混じることがあるため、JSON.parse 前に正規化するヘルパー。
+//
+// @param {string} raw - wpCli の生出力。
+// @param {*} fallback - parse に失敗したときに返すフォールバック値。
+// @return {*} parse 成功時はその値、失敗時は fallback。
+function parseWpJson( raw, fallback ) {
+	const normalized = raw
+		// 行頭のプログレス/完了マーク行（ℹ / ✔）を除去。
+		.replace( /ℹ.*$/gm, '' )
+		.replace( /✔.*$/gm, '' )
+		// JSON 本体（[ または { で始まる）が現れるまでの先頭ノイズを削除。
+		.replace( /^[^[{]*/s, '' )
+		.trim();
+	try {
+		return JSON.parse( normalized );
+	} catch {
+		return fallback;
+	}
+}
+
 // 指定した post_type の中から、fixture meta が一致する投稿のみを削除する。
 // 並列実行や他 spec との干渉を避けるため、テスト spec が作った fixture だけに削除対象を絞る。
 //
@@ -501,7 +522,7 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		// 形式: [{ term: { name, slug, description, parent, term_id, ... }, meta: [{ meta_key, meta_value }, ...] }, ...]
 		const termBackups = [];
 		for ( const tid of termIds ) {
-			// term 本体の全フィールド取得。
+			// term 本体の全フィールド取得（parseWpJson で wp-env のプログレス行を除去してから parse）。
 			const termJsonRaw = wpCli( [
 				'term',
 				'get',
@@ -509,31 +530,18 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 				tid,
 				'--format=json',
 			] );
-			let termData;
-			try {
-				termData = JSON.parse( termJsonRaw );
-			} catch ( err ) {
-				// JSON parse に失敗した場合はスキップ（最低限の name 復元は後段で試みる）。
-				termData = null;
-			}
+			const termData = parseWpJson( termJsonRaw, null );
 
-			// term meta 一覧の取得。
-			let metaList = [];
-			try {
-				const metaJsonRaw = wpCli( [
-					'term',
-					'meta',
-					'list',
-					tid,
-					'--format=json',
-				] );
-				metaList = JSON.parse( metaJsonRaw );
-				if ( ! Array.isArray( metaList ) ) {
-					metaList = [];
-				}
-			} catch ( err ) {
-				metaList = [];
-			}
+			// term meta 一覧の取得（同様に parseWpJson で正規化）。
+			const metaJsonRaw = wpCli( [
+				'term',
+				'meta',
+				'list',
+				tid,
+				'--format=json',
+			] );
+			const metaParsed = parseWpJson( metaJsonRaw, [] );
+			const metaList = Array.isArray( metaParsed ) ? metaParsed : [];
 
 			if ( termData ) {
 				termBackups.push( { term: termData, meta: metaList } );
@@ -541,6 +549,9 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		}
 
 		// 3) すべての term を削除。
+		// TODO(別 issue 化予定): salary-term の taxonomy 全削除は、共有 wp-env で他 spec / 他 worker
+		// から「削除中の窓」で 0 件に見える時間が発生するため、本 spec を専用 wp-env / DB に分離するか、
+		// test 08-b の設計を見直す必要がある。本 PR スコープ外として別 issue で対応。
 		if ( termIds.length > 0 ) {
 			wpCli( [ 'term', 'delete', 'salary-term', ...termIds ] );
 		}
@@ -569,6 +580,10 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			// 4) ターム復元: 親 term から先に作る（slug ベースで親 ID を引くため、まず parent=0 のものを処理）。
 			// 元の term_id → 新しい term_id のマッピング（parent 復元用）。
 			const oldIdToNewId = {};
+			// 復元中のエラーを集約し、finally の最後にまとめて throw する。
+			// 個別の catch でログを出すだけだとテストが silently に「成功扱い」になり、
+			// 退避データが欠損したまま後続テストに影響するため、最後に必ず可視化する。
+			const restorationErrors = [];
 
 			// 親が無い term から先に作るため、parent=0 を先に処理する 2 パスのループにする。
 			const passes = [
@@ -616,15 +631,31 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 											String( m.meta_value !== undefined ? m.meta_value : '' ),
 										] );
 									} catch ( err ) {
-										// meta 復元失敗は許容（テスト復元のベストエフォート）。
+										// meta 復元失敗もエラー集約に含める（後続の他 meta 復元は継続）。
+										restorationErrors.push(
+											`term meta restore failed for "${ t.slug || t.name }" (key=${ m.meta_key }): ${ err.message }`
+										);
 									}
 								}
 							}
+						} else {
+							// --porcelain で新 ID が拾えなかったケースもエラーとして記録。
+							restorationErrors.push(
+								`term restore failed for "${ t.slug || t.name }": no new term_id returned`
+							);
 						}
 					} catch ( err ) {
-						// 既に存在する等で失敗した場合はスキップ（ベストエフォート復元）。
+						// term create に失敗した場合はエラー集約に追加し、他 term の復元は継続。
+						restorationErrors.push(
+							`term restore failed for "${ t.slug || t.name }": ${ err.message }`
+						);
 					}
 				}
+			}
+
+			// 復元中に発生したエラーがあれば、まとめて throw して可視化する。
+			if ( restorationErrors.length > 0 ) {
+				throw new Error( restorationErrors.join( '\n' ) );
 			}
 		}
 	} );
