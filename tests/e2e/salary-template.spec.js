@@ -17,7 +17,7 @@ const { execFileSync } = require( 'child_process' );
  *   01. 給与テンプレ新規作成画面: メタボックスタイトル、スタッフ/Staff No. 復活、PDF 関連は非表示。
  *   02. テンプレ公開: スタッフ選択ありとスタッフ未選択を混在させて公開。
  *   03. 一括登録パネル UI: 支給分 select のみ、テンプレ select / スタッフ UI / 全選択ボタンが無いこと。
- *   04. 件数プレビュー: 「公開中のテンプレート N 件を「○○」で下書き作成します。」の文言。
+ *   04. 件数プレビュー: 「対象テンプレート N 件を「○○」で下書き作成します。」の文言（PR #57 で「公開中のテンプレート」から中立化）。
  *   05. 一括登録実行: 公開テンプレ全件分の salary が draft で生成、タイトルが「スタッフ名 / 支給分」。
  *       通知に「生成 / 重複スキップ / スタッフ未設定スキップ」、details にテンプレ名が列挙。
  *   06. 重複スキップ: 同条件でもう一度送信 → 全件「重複スキップ」。
@@ -319,14 +319,15 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		await expect( page.locator( '#bvsl-bulk-staff-all' ) ).toHaveCount( 0 );
 		await expect( page.locator( '.bvsl-bulk-staff-checkbox' ) ).toHaveCount( 0 );
 
-		// 公開中のテンプレ件数の説明文が出ていること（テンプレ 3 件公開中）。
+		// 対象テンプレ件数の説明文が出ていること（テンプレ 3 件 = publish + private）。
+		// PR #57 で文言を中立化（「公開中の給与テンプレートは N 件」→「一括展開の対象となる給与テンプレートは N 件」）。
 		const formText = await page.locator( '.bvsl-bulk-create__form' ).textContent();
-		expect( formText ).toContain( '公開中の給与テンプレートは 3 件です' );
+		expect( formText ).toContain( '一括展開の対象となる給与テンプレートは 3 件です' );
 
 		await page.screenshot( { path: 'tests/e2e/screenshots/pr48/03-panel-open.png', fullPage: true } );
 	} );
 
-	test( '04. 件数プレビュー: 「公開中のテンプレート N 件を「○○」で下書き作成します。」の文言が表示される', async ( { page } ) => {
+	test( '04. 件数プレビュー: 「対象テンプレート N 件を「○○」で下書き作成します。」の文言が表示される', async ( { page } ) => {
 		await loginAsAdmin( page );
 		await page.goto( '/wp-admin/edit.php?post_type=salary' );
 		await page.waitForLoadState( 'networkidle' );
@@ -339,9 +340,10 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		// 支給分を選択。
 		await page.locator( '#bvsl-bulk-term' ).selectOption( { label: '2026年5月分' } );
 
-		// 件数プレビューが「公開中のテンプレート 3 件を「2026年5月分」で下書き作成します。」になること。
+		// 件数プレビューが「対象テンプレート 3 件を「2026年5月分」で下書き作成します。」になること。
+		// PR #57 で「公開中のテンプレート」から「対象テンプレート」に文言を中立化。
 		const summaryText = ( await page.locator( '#bvsl-bulk-summary' ).textContent() ).trim();
-		expect( summaryText ).toMatch( /公開中のテンプレート\s*3\s*件を「2026年5月分」で下書き作成します/ );
+		expect( summaryText ).toMatch( /対象テンプレート\s*3\s*件を「2026年5月分」で下書き作成します/ );
 
 		await page.screenshot( { path: 'tests/e2e/screenshots/pr48/04-summary-preview.png', fullPage: true } );
 	} );
@@ -359,7 +361,8 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		let confirmShown = false;
 		page.once( 'dialog', async ( dialog ) => {
 			confirmShown = ( dialog.type() === 'confirm' );
-			expect( dialog.message() ).toMatch( /公開中のテンプレート\s*3\s*件を「2026年5月分」で下書き作成します/ );
+			// PR #57 で confirm ダイアログ文言を「公開中のテンプレート」から「対象テンプレート」に中立化。
+			expect( dialog.message() ).toMatch( /対象テンプレート\s*3\s*件を「2026年5月分」で下書き作成します/ );
 			await dialog.accept();
 		} );
 
