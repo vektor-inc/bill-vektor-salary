@@ -102,16 +102,62 @@ function purgePostFixtures( postType, { metaKey, metaValue } ) {
 	}
 }
 
+// 本 spec が作るテンプレートの post_title 一覧。
+// 旧仕様で fixture meta なしのまま作られた post（本 spec の旧バージョンや手動の残骸）が
+// 残っていると、test 02 などで同タイトル投稿が複数 hit して strict mode violation を起こす。
+// そのため、setupTestData では本 spec 専用タイトルの旧残骸も併せて掃除する。
+const FIXTURE_TEMPLATE_TITLES = [
+	'麗美標準テンプレA',
+	'麗美標準テンプレB',
+	'麗美未設定テンプレ',
+];
+
+// 指定した post_type の中から、本 spec 専用タイトルに一致するが fixture meta が付いていない
+// 旧残骸 post を削除する。これは本 spec 自身が過去に作ったが識別子付与前に作られたデータの
+// マイグレーション目的で、他 spec が独自に作るタイトルには影響しない（タイトルが本 spec 専用のため）。
+//
+// @param {string} postType - 対象の post_type。
+// @param {string[]} titles - 削除候補のタイトル一覧。
+function purgeLegacyTitledPosts( postType, titles ) {
+	for ( const title of titles ) {
+		// 同タイトルの post 一覧を ID 形式で取得（fixture meta の有無に関係なく取得）。
+		const idsRaw = wpCli( [
+			'post',
+			'list',
+			`--post_type=${ postType }`,
+			'--post_status=any',
+			'--posts_per_page=-1',
+			`--title=${ title }`,
+			'--format=ids',
+		] );
+		const ids = idsRaw
+			.replace( /ℹ.*\n/g, '' )
+			.replace( /✔.*$/m, '' )
+			.trim()
+			.split( /\s+/ )
+			.filter( ( token ) => /^\d+$/.test( token ) );
+		if ( ids.length > 0 ) {
+			wpCli( [ 'post', 'delete', ...ids, '--force' ] );
+		}
+	}
+}
+
 // 既存テストデータを掃除し、新仕様で必要な状態を作る。
 //   - 本 spec が作った fixture（meta `_e2e_fixture` = `salary-template-spec`）の salary / salary-template のみ削除。
+//   - 本 spec 専用タイトル（FIXTURE_TEMPLATE_TITLES）の旧残骸も併せて削除（マイグレーション）。
 //   - スタッフ A / B / C と salary-term 「2026年5月分」「2026年6月分」は前提として残す。
 //   - 「麗美標準テンプレ（スタッフA向け）」「麗美標準テンプレB（スタッフB向け）」「麗美未設定テンプレ（スタッフ未選択）」を
 //     新規作成し、それぞれ fixture meta と salary_staff メタを設定する。
 function setupTestData() {
-	// 本 spec の fixture meta が付いた salary / salary-template のみを掃除する。
+	// 本 spec の fixture meta が付いた salary / salary-template を掃除する。
 	// 他の spec や手動作成データは削除しない（並列実行・マルチ spec 干渉を回避）。
 	purgePostFixtures( 'salary', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
 	purgePostFixtures( 'salary-template', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
+
+	// 本 spec 専用タイトルで作られた fixture meta なしの旧残骸 post も併せて削除。
+	// 旧バージョンの本 spec が作って残っていたデータが test 02 等の同タイトル多重 hit を
+	// 引き起こすのを防ぐ。タイトルは本 spec 専用のため、他 spec への影響なし。
+	purgeLegacyTitledPosts( 'salary-template', FIXTURE_TEMPLATE_TITLES );
 
 	// スタッフ A / B の ID を取得（CLI の出力からフィルタ）。
 	function getStaffIdByTitle( title ) {
