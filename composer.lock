@@ -3087,7 +3087,7 @@
     "platform": {},
     "platform-dev": {},
     "platform-overrides": {
-        "php": "7.4.33"
+        "php": "8.0.0"
     },
     "plugin-api-version": "2.9.0"
 }
