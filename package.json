@@ -15,6 +15,6 @@
 		"grunt-wp-i18n": "~1.0.4",
 		"grunt-wp-readme-to-markdown": "~2.1.0",
 		"gulp": "^4.0.2",
-		"npm-check-updates": "^16.3.16"
+		"npm-check-updates": "^23.1.0"
 	}
 }
