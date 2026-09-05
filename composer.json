@@ -1,7 +1,7 @@
 {
     "name": "vektor-inc/bill-vektor-salary",
     "require-dev": {
-        "sirbrillig/phpcs-variable-analysis": "^2.11",
+        "sirbrillig/phpcs-variable-analysis": "^3.0",
         "wp-phpunit/wp-phpunit": "^6.4.1",
         "phpcompatibility/phpcompatibility-wp": "*",
         "yoast/phpunit-polyfills": "^1.1.0",
