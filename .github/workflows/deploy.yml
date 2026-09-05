@@ -106,7 +106,7 @@ jobs:
                   npm run dist
                   cd dist/ && zip -r ${{ env.plugin_name }}.zip ${{ env.plugin_name }}/ && mv ${{ env.plugin_name }}.zip ${GITHUB_WORKSPACE}
             - name: rsync deployments
-              uses: burnett01/rsync-deployments@5.2.1
+              uses: burnett01/rsync-deployments@9.0.0
               with:
                   switches: -avzr
                   path: ${{ env.plugin_name }}.zip
