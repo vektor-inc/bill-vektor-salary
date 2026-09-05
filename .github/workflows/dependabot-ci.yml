@@ -1,0 +1,41 @@
+# Dependabot の PR に対して、依存関係のインストールが通るかを確認する軽量な CI。
+# dependabot-auto-merge-complete.yml がこのワークフローの成功を見てマージする。
+#
+# PHPUnit（wp-env で WordPress を起動するため実行時間が長い）は従来どおり
+# run-ci ラベル付きの PR でのみ実行する。人が作った PR ではこのワークフローは動かない。
+name: Dependabot CI
+
+on:
+  pull_request:
+    branches:
+      - master
+    # labeled を含めない。Dependabot は PR 作成直後に dependencies などのラベルを
+    # 次々に付けるため、含めるとそのたびに起動して同じ内容を何度もビルドする。
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Setup PHP 8.0
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+
+      - name: Install npm packages
+        run: npm install
+
+      # このリポジトリには npm run build が無い（配布物の生成は gulp、PHPUnit は wp-env）ため、
+      # ビルドは行わず npm と Composer のインストールが通ることだけを確認する。
+      - name: Install Composer packages
+        run: composer install --no-interaction --prefer-dist
