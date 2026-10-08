@@ -309,7 +309,7 @@ class Salary_Table_Custom_Fields {
 			'salary_syotokuzei'           => array(
 				'label'       => '所得税',
 				'type'        => 'text',
-				'description' => '課税対象額をもとに<a href="https://keisan.casio.jp/exec/system/1527476109" target="_blank">給与所得の源泉徴収税額計算サイト</a>などで算出する',
+				'description' => '課税対象額をもとに<a href="https://keisan.site/exec/system/1763340603" target="_blank">給与所得の源泉徴収税額計算サイト</a>などで算出する',
 				'required'    => false,
 			),
 			'salary_jyuuminzei'           => array(
