@@ -17,6 +17,7 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 * [ 仕様変更 ] mpdf を 8.2.7 から 8.3.1 にアップデート
 * [ 仕様変更 ] fpdi を 2.6.4 から 2.6.8 にアップデート
 * [ 仕様変更 ] plugin-update-checker を 5.6 から 5.7 にアップデート
+* [ 開発環境 ] 開発・CI で使う Node.js を 24.22.1 以上に更新
 
 = 0.13.0 =
 * [ 機能追加 ] 一括登録パネルで対象とする支給分タームを絞り込む拡張ポイント `bvsl_bulk_create_panel_terms` フィルターを追加
