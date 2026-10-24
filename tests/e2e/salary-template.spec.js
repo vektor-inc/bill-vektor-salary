@@ -1,5 +1,6 @@
 const { test, expect } = require( '@playwright/test' );
 const { execFileSync } = require( 'child_process' );
+const { login } = require( './utils/login' );
 
 /**
  * PR #48: 給与テンプレート機能 + 一括登録 機能の e2e テスト（仕様変更後）。
@@ -32,23 +33,6 @@ const { execFileSync } = require( 'child_process' );
 // 並列実行や他 spec との衝突を避けるため、purge 時にこの識別子で限定削除する。
 const FIXTURE_META_KEY = '_e2e_fixture';
 const FIXTURE_META_VALUE = 'salary-template-spec';
-
-// ログインフォームへ認証情報をまとめて設定し、送信と遷移を同時に待つ。
-// 個別の fill 中に画面更新が挟まって入力先がずれる不安定さを避ける。
-//
-// @param {import('@playwright/test').Page} page - 操作対象ページ。
-// @param {string} userLogin - ユーザー名。
-async function login( page, userLogin ) {
-	await page.goto( '/wp-login.php' );
-	await Promise.all( [
-		page.waitForURL( /wp-admin/ ),
-		page.locator( '#loginform' ).evaluate( ( form, credentials ) => {
-			form.elements.log.value = credentials.userLogin;
-			form.elements.pwd.value = credentials.password;
-			form.requestSubmit();
-		}, { userLogin, password: 'password' } ),
-	] );
-}
 
 // admin としてログインする共通処理。
 async function loginAsAdmin( page ) {

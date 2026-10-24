@@ -1,5 +1,6 @@
 const { test, expect } = require( '@playwright/test' );
 const { execFileSync } = require( 'child_process' );
+const { login } = require( './utils/login' );
 
 /**
  * PR #57: 給与テンプレ一括登録パネルの件数取得を wp_count_posts() ベース化 + 文言中立化の e2e テスト。
@@ -21,11 +22,7 @@ const FIXTURE_META_VALUE = 'pr57-bulk-create-count-spec';
 
 // admin としてログイン。
 async function loginAsAdmin( page ) {
-	await page.goto( '/wp-login.php' );
-	await page.locator( '#user_login' ).fill( 'admin' );
-	await page.locator( '#user_pass' ).fill( 'password' );
-	await page.locator( '#wp-submit' ).click();
-	await page.waitForURL( /wp-admin/ );
+	await login( page, 'admin' );
 }
 
 // wp-cli 呼び出しヘルパ（execFileSync ベースで shell 経由を避ける）。
