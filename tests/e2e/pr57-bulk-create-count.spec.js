@@ -1,6 +1,7 @@
 const { test, expect } = require( '@playwright/test' );
 const { execFileSync } = require( 'child_process' );
 const { login } = require( './utils/login' );
+const { getWpEnvCliContainer } = require( './utils/wp-env' );
 
 /**
  * PR #57: 給与テンプレ一括登録パネルの件数取得を wp_count_posts() ベース化 + 文言中立化の e2e テスト。
@@ -33,7 +34,7 @@ function wpCli( argsArray ) {
 	}
 	return execFileSync(
 		'npx',
-		[ 'wp-env', 'run', 'cli', 'wp', ...argsArray ],
+		[ 'wp-env', 'run', getWpEnvCliContainer(), 'wp', ...argsArray ],
 		{
 			encoding: 'utf8',
 			// 1 コマンドあたり 30 秒で打ち切り（wp-env 側のハング保険）。
@@ -208,7 +209,7 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 	// fixture のセットアップに wp-cli を多数呼ぶため、テストごとのタイムアウトを延長する。
 	test.setTimeout( 180000 );
 
-	test.beforeEach( async ( { page } ) => {
+	test.beforeAll( () => {
 		// 既存 fixture を掃除。
 		// salary は bill_copy_post の複製なので fixture meta が引き継がれない。
 		// 一括登録で生成される salary のタイトルは「<staff_title> / <term_name>」になり
@@ -220,6 +221,10 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		purgeTermFixtures( 'salary-term' );
 		// 新規 fixture を投入。
 		setupFixtures();
+	} );
+
+	test.beforeEach( async ( { page } ) => {
+		// データ準備の時間を各テストのログイン制限に含めない。
 		await loginAsAdmin( page );
 	} );
 

@@ -1,6 +1,7 @@
 const { test, expect } = require( '@playwright/test' );
 const { execFileSync } = require( 'child_process' );
 const { login } = require( './utils/login' );
+const { getWpEnvCliContainer } = require( './utils/wp-env' );
 
 /**
  * PR #48: 給与テンプレート機能 + 一括登録 機能の e2e テスト（仕様変更後）。
@@ -50,7 +51,7 @@ async function loginAsSalaryEditor( page ) {
 //
 // セキュリティ対策として、引数は文字列ではなくトークン配列で受け取り、
 // `execFileSync` で実行する（`execSync` だとシェルが介在し、コマンドインジェクションの
-// 余地が生まれるため）。`npx wp-env run cli wp ...` の構造は維持する。
+// 余地が生まれるため）。`npx wp-env run <container> wp ...` の構造は維持する。
 //
 // @param {string[]} argsArray - wp の後ろに渡す引数のトークン配列。例: ['post', 'list', '--post_type=salary']
 // @return {string} stdout の文字列。
@@ -60,7 +61,7 @@ function wpCli( argsArray ) {
 	}
 	return execFileSync(
 		'npx',
-		[ 'wp-env', 'run', 'cli', 'wp', ...argsArray ],
+		[ 'wp-env', 'run', getWpEnvCliContainer(), 'wp', ...argsArray ],
 		{ encoding: 'utf8' }
 	);
 }
@@ -363,6 +364,14 @@ test.beforeAll( () => {
 	setupTestData( prerequisiteStaffIds );
 } );
 
+// 繰り返し実行時に、別 spec のテンプレート件数へ本 spec の fixture を混入させない。
+test.afterAll( () => {
+	purgePostFixtures( 'salary', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
+	purgePostFixtures( 'salary-template', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
+	purgeLegacyTitledPosts( 'salary-template', FIXTURE_TEMPLATE_TITLES );
+	purgeLegacyTitledPosts( 'salary', FIXTURE_SALARY_TITLES );
+} );
+
 test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様変更後）', () => {
 
 	test( '01. 給与テンプレート新規作成画面: メタボックスタイトル / スタッフ・StaffNo. 復活 / PDF 関連は非表示', async ( { page } ) => {
@@ -616,9 +625,8 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		// e2e 専用 mu-plugin（tests/e2e/mu-plugins/bvsl-e2e-helper.php）が cookie をトリガーに
 		// 空配列を返す仕組みで、このセッションだけ「支給分 0 件」状態を再現する。
 		//
-		// mu-plugin 側の発火条件は以下の二重ガード:
-		//   1. WP_DEBUG === true（wp-env では .wp-env.json で true に設定済み）
-		//   2. cookie `bvsl_e2e_force_no_terms=1` が付与されている
+		// mu-plugin は wp-env にだけマッピングされ、専用 cookie
+		// `bvsl_e2e_force_no_terms=1` が付いたリクエストでのみ発火する。
 		//
 		// この cookie は本テストの中だけで完結させ、テスト終了時に確実に削除する。
 		// DB 状態を一切変更しないため、他 spec / 他 worker への干渉は発生しない。
@@ -647,7 +655,7 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			// 一括登録パネルが「支給分未登録」状態で描画されていることを確認する。
 			const panel = page.locator( 'details.bvsl-bulk-create' );
 			await expect( panel ).toBeVisible();
-			// 0 件状態のときはガイダンスを見せたいので open になっている想定（render_panel() の仕様）。
+			// 0 件状態ではガイダンスをすぐ確認できるよう初期表示を開く。
 			const isOpen = await panel.evaluate( ( el ) => el.hasAttribute( 'open' ) );
 			expect( isOpen ).toBe( true );
 
