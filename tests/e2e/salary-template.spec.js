@@ -94,6 +94,23 @@ function trimWpOutput( raw ) {
 	return raw.replace( /ℹ.*$/gm, '' ).replace( /✔.*$/gm, '' ).trim();
 }
 
+// wp-env の装飾行や PHP notice が混じっても、WP-CLI が返した数値 ID の行だけを取得する。
+//
+// @param {string} raw - wpCli の生出力。
+// @param {string} context - ID を取得した処理の説明。
+// @return {string} 数値の ID。
+function extractWpId( raw, context ) {
+	const id = trimWpOutput( raw )
+		.split( /\s+/ )
+		.find( ( token ) => /^\d+$/.test( token ) );
+
+	if ( ! id ) {
+		throw new Error( `${ context }から数値 ID を取得できませんでした。WP-CLI 出力: ${ raw.trim() }` );
+	}
+
+	return id;
+}
+
 // タイトルが完全一致するスタッフを取得し、存在しなければ fixture として作成する。
 // 前提データは spec 間で共有するため削除せず、作成元を meta で識別可能にして残す。
 //
@@ -105,7 +122,7 @@ function ensureStaff( title, staffNumber ) {
 		'post',
 		'list',
 		'--post_type=staff',
-		'--post_status=any',
+		'--post_status=publish',
 		'--posts_per_page=-1',
 		'--format=json',
 		'--fields=ID,post_title',
@@ -115,14 +132,14 @@ function ensureStaff( title, staffNumber ) {
 		return String( existingStaff.ID );
 	}
 
-	const staffId = trimWpOutput( wpCli( [
+	const staffId = extractWpId( wpCli( [
 		'post',
 		'create',
 		'--post_type=staff',
 		'--post_status=publish',
 		`--post_title=${ title }`,
 		'--porcelain',
-	] ) );
+	] ), `スタッフ「${ title }」の作成結果` );
 	wpCli( [ 'post', 'meta', 'update', staffId, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 	wpCli( [ 'post', 'meta', 'update', staffId, 'salary_staff_number', staffNumber ] );
 	wpCli( [ 'post', 'meta', 'update', staffId, 'salary_staff_status', 'employed' ] );
@@ -146,14 +163,14 @@ function ensureSalaryTerm( name, slug ) {
 		return;
 	}
 
-	const termId = trimWpOutput( wpCli( [
+	const termId = extractWpId( wpCli( [
 		'term',
 		'create',
 		'salary-term',
 		name,
 		`--slug=${ slug }`,
 		'--porcelain',
-	] ) );
+	] ), `支給分「${ name }」の作成結果` );
 	wpCli( [ 'term', 'meta', 'update', termId, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 }
 
@@ -292,14 +309,14 @@ function setupTestData( staffIds ) {
 	const { staffA, staffB } = staffIds;
 
 	// 「麗美標準テンプレ（スタッフA）」: スタッフあり。
-	const tplA = wpCli( [
+	const tplA = extractWpId( wpCli( [
 		'post',
 		'create',
 		'--post_type=salary-template',
 		'--post_status=publish',
 		'--post_title=麗美標準テンプレA',
 		'--porcelain',
-	] ).trim();
+	] ), '給与テンプレート「麗美標準テンプレA」の作成結果' );
 	// fixture 識別子を付与（後続の purge 対象に含めるため）。
 	wpCli( [ 'post', 'meta', 'update', tplA, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 	wpCli( [ 'post', 'meta', 'update', tplA, 'salary_staff', staffA ] );
@@ -307,28 +324,28 @@ function setupTestData( staffIds ) {
 	wpCli( [ 'post', 'meta', 'update', tplA, 'salary_base', '300000' ] );
 
 	// 「麗美標準テンプレB（スタッフB）」: スタッフあり。
-	const tplB = wpCli( [
+	const tplB = extractWpId( wpCli( [
 		'post',
 		'create',
 		'--post_type=salary-template',
 		'--post_status=publish',
 		'--post_title=麗美標準テンプレB',
 		'--porcelain',
-	] ).trim();
+	] ), '給与テンプレート「麗美標準テンプレB」の作成結果' );
 	wpCli( [ 'post', 'meta', 'update', tplB, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 	wpCli( [ 'post', 'meta', 'update', tplB, 'salary_staff', staffB ] );
 	wpCli( [ 'post', 'meta', 'update', tplB, 'salary_staff_number', '002' ] );
 	wpCli( [ 'post', 'meta', 'update', tplB, 'salary_base', '280000' ] );
 
 	// 「麗美未設定テンプレ」: スタッフ未設定（salary_staff メタを設定しない）。
-	const tplC = wpCli( [
+	const tplC = extractWpId( wpCli( [
 		'post',
 		'create',
 		'--post_type=salary-template',
 		'--post_status=publish',
 		'--post_title=麗美未設定テンプレ',
 		'--porcelain',
-	] ).trim();
+	] ), '給与テンプレート「麗美未設定テンプレ」の作成結果' );
 	wpCli( [ 'post', 'meta', 'update', tplC, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 
 	return { tplA, tplB };
@@ -714,14 +731,14 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		} );
 		expect( staffId, 'スタッフが 1 件以上登録されている' ).not.toBe( '' );
 
-		const salaryId = wpCli( [
+		const salaryId = extractWpId( wpCli( [
 			'post',
 			'create',
 			'--post_type=salary',
 			'--post_status=draft',
 			'--post_title=デグレ確認用',
 			'--porcelain',
-		] ).trim().split( '\n' ).filter( ( l ) => /^\d+$/.test( l.trim() ) )[ 0 ];
+		] ), '給与明細「デグレ確認用」の作成結果' );
 		// fixture 識別子を付与（後続 spec の purge 対象に含めるため）。
 		wpCli( [ 'post', 'meta', 'update', salaryId, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 		wpCli( [ 'post', 'meta', 'update', salaryId, 'salary_staff', staffId ] );

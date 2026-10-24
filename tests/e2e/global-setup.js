@@ -1,5 +1,6 @@
 const { execFileSync } = require( 'child_process' );
 
+// 開発用 wp-env のサイト言語を ja に切り替える（元に戻さない）。
 // WordPress コアの日本語表示を、既存環境と空の wp-env の両方で再現する。
 // プラグイン固有の文言は日本語原文であり、追加の言語パックは不要。
 module.exports = () => {
@@ -13,9 +14,16 @@ module.exports = () => {
 		return;
 	}
 
-	execFileSync(
-		'npx',
-		[ 'wp-env', 'run', 'cli', 'wp', 'language', 'core', 'install', 'ja', '--activate' ],
-		{ encoding: 'utf8', stdio: 'inherit' }
-	);
+	try {
+		execFileSync(
+			'npx',
+			[ 'wp-env', 'run', 'cli', 'wp', 'language', 'core', 'install', 'ja', '--activate' ],
+			{ encoding: 'utf8', stdio: 'inherit' }
+		);
+	} catch ( error ) {
+		throw new Error(
+			'日本語言語パックのインストールに失敗しました。ネットワーク接続を確認してください。',
+			{ cause: error }
+		);
+	}
 };
