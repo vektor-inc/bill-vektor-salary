@@ -481,16 +481,19 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			await dialog.accept();
 		} );
 
-		// 送信。
+		// 同じ給与明細一覧 URL へ戻るため、waitForURL では POST 完了を待てない。
 		await Promise.all( [
-			page.waitForURL( /edit\.php\?post_type=salary/, { timeout: 30000 } ),
+			page.waitForResponse(
+				( response ) => response.url().includes( '/wp-admin/admin-post.php' ) && response.request().method() === 'POST',
+				{ timeout: 30000 }
+			),
 			page.locator( '#bvsl-bulk-submit' ).click(),
 		] );
 
 		expect( confirmShown, '送信前の confirm ダイアログが出ていない' ).toBe( true );
 
 		// 成功通知の検証。
-		const notice = page.locator( '.notice-success' );
+		const notice = page.locator( 'div.notice-success' );
 		await expect( notice ).toBeVisible();
 		await expect( notice ).toContainText( '一括登録しました' );
 		// 生成: 2（A / B のスタッフあり）/ 重複: 0 / スタッフ未設定: 1（麗美未設定テンプレ）。
@@ -529,12 +532,16 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			await dialog.accept();
 		} );
 
+		// 同じ給与明細一覧 URL へ戻るため、waitForURL では POST 完了を待てない。
 		await Promise.all( [
-			page.waitForURL( /edit\.php\?post_type=salary/, { timeout: 30000 } ),
+			page.waitForResponse(
+				( response ) => response.url().includes( '/wp-admin/admin-post.php' ) && response.request().method() === 'POST',
+				{ timeout: 30000 }
+			),
 			page.locator( '#bvsl-bulk-submit' ).click(),
 		] );
 
-		const notice = page.locator( '.notice-success' );
+		const notice = page.locator( 'div.notice-success' );
 		await expect( notice ).toBeVisible();
 		await expect( notice ).toContainText( '生成: 0 件' );
 		await expect( notice ).toContainText( '重複スキップ: 2 件' );

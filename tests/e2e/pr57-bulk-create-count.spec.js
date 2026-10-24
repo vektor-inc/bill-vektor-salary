@@ -312,13 +312,18 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		} );
 
 		// 送信ボタンを押す。
-		// URL 待機をクリックと同時に張り、給与明細一覧へのリダイレクト完了を待つ。
+		// 同じ給与明細一覧 URL へ戻るため、waitForURL では POST 完了を待てない。
 		const submitBtn = page.locator( '#bvsl-bulk-submit' );
 		await expect( submitBtn ).toBeEnabled();
 		await Promise.all( [
-			page.waitForURL( /edit\.php\?post_type=salary/, { timeout: 30000 } ),
+			page.waitForResponse(
+				( response ) => response.url().includes( '/wp-admin/admin-post.php' ) && response.request().method() === 'POST',
+				{ timeout: 30000 }
+			),
 			submitBtn.click(),
 		] );
+		// リダイレクト先で一括登録の結果通知が描画されるまで待つ。
+		await expect( page.locator( 'div.notice-success' ) ).toBeVisible();
 
 		// publish 2 件 + private 1 件 = 3 件分の salary が draft で生成されているはず。
 		// title prefix で確認する（「PR57_Staff_X / PR57_Term_2026_05」のような形になる想定）。
