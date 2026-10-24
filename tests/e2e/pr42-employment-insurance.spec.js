@@ -11,7 +11,6 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 	test( '1. グローバル設定ページ - 事業の種類が表示・保存できる', async ( { page } ) => {
 		// 給与明細 > 給与設定ページを開く。
 		await page.goto( '/wp-admin/edit.php?post_type=salary&page=bvsl-settings' );
-		await page.waitForLoadState( 'networkidle' );
 
 		// 「事業の種類」セレクトボックスが表示されていることを確認する。
 		const businessTypeSelect = page.locator( '#bvsl_business_type' );
@@ -22,8 +21,10 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 
 		// 「建設の事業」を選択して保存する。
 		await businessTypeSelect.selectOption( 'construction' );
-		await page.locator( '#submit' ).click();
-		await page.waitForLoadState( 'networkidle' );
+		await Promise.all( [
+			page.waitForURL( /[?&]settings-updated=true(?:&|$)/ ),
+			page.locator( '#submit' ).click(),
+		] );
 
 		// 保存後、値が保持されていることを確認する。
 		await expect( businessTypeSelect ).toHaveValue( 'construction' );
@@ -39,7 +40,6 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 	test( '2. スタッフ投稿 - 事業の種類フィールドが表示される', async ( { page } ) => {
 		// スタッフ新規追加ページを開く。
 		await page.goto( '/wp-admin/post-new.php?post_type=staff' );
-		await page.waitForLoadState( 'networkidle' );
 
 		// 「事業の種類」セレクトボックスが存在することを確認する。
 		const staffBusinessType = page.locator( '#salary_business_type' );
@@ -58,12 +58,13 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 		await page.locator( '#title' ).fill( 'E2Eテスト用スタッフ' );
 
 		// 公開ボタンをクリックする。
-		await page.locator( '#publish' ).click();
-		await page.waitForLoadState( 'networkidle' );
+		await Promise.all( [
+			page.waitForURL( /post\.php\?post=\d+&action=edit/ ),
+			page.locator( '#publish' ).click(),
+		] );
 
-		// 投稿が正常に公開されたことを確認する。
-		await expect( page.locator( '#message' ) ).toBeVisible();
-		await expect( page.locator( '#message' ) ).toContainText( '投稿を公開しました' );
+		// 成功通知のクラスで確認し、WordPress の表示言語には依存させない。
+		await expect( page.locator( '#message.notice-success' ) ).toBeVisible();
 
 		// スクリーンショット: スタッフ保存後。
 		await page.screenshot( { path: 'tests/e2e/screenshots/04-staff-saved.png', fullPage: true } );
@@ -72,19 +73,19 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 	test( '3. 給与明細 - スタッフ選択時のデフォルト値自動反映', async ( { page } ) => {
 		// まずテスト用スタッフを作成する。
 		await page.goto( '/wp-admin/post-new.php?post_type=staff' );
-		await page.waitForLoadState( 'networkidle' );
 		await page.locator( '#title' ).fill( 'E2E自動反映テスト用スタッフ' );
 		await page.locator( '#salary_staff_number' ).fill( 'E2E-002' );
 		await page.locator( '#salary_fuyou' ).fill( '2' );
 		await page.locator( '#salary_base' ).fill( '300000' );
 		await page.locator( '#salary_transportation_total' ).fill( '15000' );
 		await page.locator( '#salary_business_type' ).selectOption( 'agriculture' );
-		await page.locator( '#publish' ).click();
-		await page.waitForLoadState( 'networkidle' );
+		await Promise.all( [
+			page.waitForURL( /post\.php\?post=\d+&action=edit/ ),
+			page.locator( '#publish' ).click(),
+		] );
 
 		// 給与明細の新規追加ページを開く。
 		await page.goto( '/wp-admin/post-new.php?post_type=salary' );
-		await page.waitForLoadState( 'networkidle' );
 
 		// スクリーンショット: 給与明細初期表示。
 		await page.screenshot( { path: 'tests/e2e/screenshots/05-salary-new-initial.png', fullPage: true } );
@@ -130,7 +131,6 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 	test( '4. 給与明細 - 既存値は上書きされない', async ( { page } ) => {
 		// テスト用スタッフを確認する（テスト3で作成済み）。
 		await page.goto( '/wp-admin/post-new.php?post_type=salary' );
-		await page.waitForLoadState( 'networkidle' );
 
 		// 先に基本給を手動入力する。
 		const baseSalary = page.locator( '#salary_base' );
@@ -167,7 +167,6 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 	test( '5. 雇用保険料率 - 事業種類別の計算確認', async ( { page } ) => {
 		// 給与明細の新規追加ページを開く。
 		await page.goto( '/wp-admin/post-new.php?post_type=salary' );
-		await page.waitForLoadState( 'networkidle' );
 
 		// 基本給を入力する。
 		await page.locator( '#salary_base' ).fill( '300000' );
@@ -198,7 +197,6 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 	test( '6. 給与対象時期の選択肢 - 令和8年4月1日〜が追加されている', async ( { page } ) => {
 		// 給与明細の新規追加ページを開く。
 		await page.goto( '/wp-admin/post-new.php?post_type=salary' );
-		await page.waitForLoadState( 'networkidle' );
 
 		// 給与対象時期のオプションを確認する。
 		const termSelect = page.locator( '#salary_target_term' );
@@ -218,7 +216,6 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 	test( '7. デグレ確認 - 既存の料率が変わっていない', async ( { page } ) => {
 		// 給与明細の新規追加ページを開く。
 		await page.goto( '/wp-admin/post-new.php?post_type=salary' );
-		await page.waitForLoadState( 'networkidle' );
 
 		// 基本給を入力する。
 		await page.locator( '#salary_base' ).fill( '300000' );

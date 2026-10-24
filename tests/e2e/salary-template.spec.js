@@ -1,6 +1,7 @@
 const { test, expect } = require( '@playwright/test' );
 const { execFileSync } = require( 'child_process' );
 const { login } = require( './utils/login' );
+const { getWpEnvCliContainer } = require( './utils/wp-env' );
 
 /**
  * PR #48: 給与テンプレート機能 + 一括登録 機能の e2e テスト（仕様変更後）。
@@ -50,7 +51,7 @@ async function loginAsSalaryEditor( page ) {
 //
 // セキュリティ対策として、引数は文字列ではなくトークン配列で受け取り、
 // `execFileSync` で実行する（`execSync` だとシェルが介在し、コマンドインジェクションの
-// 余地が生まれるため）。`npx wp-env run cli wp ...` の構造は維持する。
+// 余地が生まれるため）。`npx wp-env run <container> wp ...` の構造は維持する。
 //
 // @param {string[]} argsArray - wp の後ろに渡す引数のトークン配列。例: ['post', 'list', '--post_type=salary']
 // @return {string} stdout の文字列。
@@ -60,7 +61,7 @@ function wpCli( argsArray ) {
 	}
 	return execFileSync(
 		'npx',
-		[ 'wp-env', 'run', 'cli', 'wp', ...argsArray ],
+		[ 'wp-env', 'run', getWpEnvCliContainer(), 'wp', ...argsArray ],
 		{ encoding: 'utf8' }
 	);
 }
@@ -267,6 +268,14 @@ const FIXTURE_SALARY_TITLES = [
 	'麗美テストスタッフB / 2026年6月分',
 ];
 
+// 本 spec の fixture meta または専用タイトルで識別できる投稿を掃除する。
+function purgeSpecFixtures() {
+	purgePostFixtures( 'salary', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
+	purgePostFixtures( 'salary-template', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
+	purgeLegacyTitledPosts( 'salary-template', FIXTURE_TEMPLATE_TITLES );
+	purgeLegacyTitledPosts( 'salary', FIXTURE_SALARY_TITLES );
+}
+
 // 指定した post_type の中から、本 spec 専用タイトルに一致するが fixture meta が付いていない
 // 旧残骸 post を削除する。これは本 spec 自身が過去に作ったが識別子付与前に作られたデータの
 // マイグレーション目的で、他 spec が独自に作るタイトルには影響しない（タイトルが本 spec 専用のため）。
@@ -299,17 +308,8 @@ function purgeLegacyTitledPosts( postType, titles ) {
 //   - 「麗美標準テンプレ（スタッフA向け）」「麗美標準テンプレB（スタッフB向け）」「麗美未設定テンプレ（スタッフ未選択）」を
 //     新規作成し、それぞれ fixture meta と salary_staff メタを設定する。
 function setupTestData( staffIds ) {
-	// 本 spec の fixture meta が付いた salary / salary-template を掃除する。
-	// 他の spec や手動作成データは削除しない（並列実行・マルチ spec 干渉を回避）。
-	purgePostFixtures( 'salary', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
-	purgePostFixtures( 'salary-template', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
-
-	// 本 spec 専用タイトルで作られた fixture meta なしの旧残骸 post も併せて削除。
-	// 旧バージョンの本 spec が作って残っていたデータが test 02 等の同タイトル多重 hit を
-	// 引き起こすのを防ぐ。タイトルは本 spec 専用のため、他 spec への影響なし。
-	purgeLegacyTitledPosts( 'salary-template', FIXTURE_TEMPLATE_TITLES );
-	// 一括登録で生成された給与明細は fixture meta が引き継がれないため、専用タイトルで掃除する。
-	purgeLegacyTitledPosts( 'salary', FIXTURE_SALARY_TITLES );
+	// fixture meta または専用タイトルで識別し、他の spec や手動作成データを残して掃除する。
+	purgeSpecFixtures();
 
 	const { staffA, staffB } = staffIds;
 
@@ -361,6 +361,11 @@ let prerequisiteStaffIds;
 test.beforeAll( () => {
 	prerequisiteStaffIds = ensurePrerequisites();
 	setupTestData( prerequisiteStaffIds );
+} );
+
+// 繰り返し実行時に、別 spec のテンプレート件数へ本 spec の fixture を混入させない。
+test.afterAll( () => {
+	purgeSpecFixtures();
 } );
 
 test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様変更後）', () => {
@@ -476,16 +481,19 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			await dialog.accept();
 		} );
 
-		// 送信。
+		// 同じ給与明細一覧 URL へ戻るため、waitForURL では POST 完了を待てない。
 		await Promise.all( [
-			page.waitForURL( /edit\.php\?post_type=salary/, { timeout: 30000 } ),
+			page.waitForResponse(
+				( response ) => response.url().includes( '/wp-admin/admin-post.php' ) && response.request().method() === 'POST',
+				{ timeout: 30000 }
+			),
 			page.locator( '#bvsl-bulk-submit' ).click(),
 		] );
 
 		expect( confirmShown, '送信前の confirm ダイアログが出ていない' ).toBe( true );
 
 		// 成功通知の検証。
-		const notice = page.locator( '.notice-success' );
+		const notice = page.locator( 'div.notice-success' );
 		await expect( notice ).toBeVisible();
 		await expect( notice ).toContainText( '一括登録しました' );
 		// 生成: 2（A / B のスタッフあり）/ 重複: 0 / スタッフ未設定: 1（麗美未設定テンプレ）。
@@ -524,12 +532,16 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			await dialog.accept();
 		} );
 
+		// 同じ給与明細一覧 URL へ戻るため、waitForURL では POST 完了を待てない。
 		await Promise.all( [
-			page.waitForURL( /edit\.php\?post_type=salary/, { timeout: 30000 } ),
+			page.waitForResponse(
+				( response ) => response.url().includes( '/wp-admin/admin-post.php' ) && response.request().method() === 'POST',
+				{ timeout: 30000 }
+			),
 			page.locator( '#bvsl-bulk-submit' ).click(),
 		] );
 
-		const notice = page.locator( '.notice-success' );
+		const notice = page.locator( 'div.notice-success' );
 		await expect( notice ).toBeVisible();
 		await expect( notice ).toContainText( '生成: 0 件' );
 		await expect( notice ).toContainText( '重複スキップ: 2 件' );
@@ -616,9 +628,8 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		// e2e 専用 mu-plugin（tests/e2e/mu-plugins/bvsl-e2e-helper.php）が cookie をトリガーに
 		// 空配列を返す仕組みで、このセッションだけ「支給分 0 件」状態を再現する。
 		//
-		// mu-plugin 側の発火条件は以下の二重ガード:
-		//   1. WP_DEBUG === true（wp-env では .wp-env.json で true に設定済み）
-		//   2. cookie `bvsl_e2e_force_no_terms=1` が付与されている
+		// mu-plugin は wp-env にだけマッピングされ、専用 cookie
+		// `bvsl_e2e_force_no_terms=1` が付いたリクエストでのみ発火する。
 		//
 		// この cookie は本テストの中だけで完結させ、テスト終了時に確実に削除する。
 		// DB 状態を一切変更しないため、他 spec / 他 worker への干渉は発生しない。
@@ -647,7 +658,7 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			// 一括登録パネルが「支給分未登録」状態で描画されていることを確認する。
 			const panel = page.locator( 'details.bvsl-bulk-create' );
 			await expect( panel ).toBeVisible();
-			// 0 件状態のときはガイダンスを見せたいので open になっている想定（render_panel() の仕様）。
+			// 0 件状態ではガイダンスをすぐ確認できるよう初期表示を開く。
 			const isOpen = await panel.evaluate( ( el ) => el.hasAttribute( 'open' ) );
 			expect( isOpen ).toBe( true );
 

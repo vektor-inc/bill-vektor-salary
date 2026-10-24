@@ -1,6 +1,7 @@
 const { test, expect } = require( '@playwright/test' );
 const { execFileSync } = require( 'child_process' );
 const { login } = require( './utils/login' );
+const { getWpEnvCliContainer } = require( './utils/wp-env' );
 
 /**
  * PR #57: 給与テンプレ一括登録パネルの件数取得を wp_count_posts() ベース化 + 文言中立化の e2e テスト。
@@ -33,7 +34,7 @@ function wpCli( argsArray ) {
 	}
 	return execFileSync(
 		'npx',
-		[ 'wp-env', 'run', 'cli', 'wp', ...argsArray ],
+		[ 'wp-env', 'run', getWpEnvCliContainer(), 'wp', ...argsArray ],
 		{
 			encoding: 'utf8',
 			// 1 コマンドあたり 30 秒で打ち切り（wp-env 側のハング保険）。
@@ -189,6 +190,15 @@ function setupFixtures() {
 	};
 }
 
+// 本 spec が作る fixture と、複製時に識別 meta が引き継がれない給与明細を掃除する。
+function purgeSpecFixtures() {
+	purgePostsByTitlePrefix( 'salary', 'PR57_Staff_' );
+	purgePostFixtures( 'salary' );
+	purgePostFixtures( 'salary-template' );
+	purgePostFixtures( 'salary-staff' );
+	purgeTermFixtures( 'salary-term' );
+}
+
 // パネルの details を確実に開く。
 async function ensurePanelOpen( page ) {
 	const details = page.locator( 'details.bvsl-bulk-create' ).first();
@@ -202,33 +212,29 @@ async function ensurePanelOpen( page ) {
 test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', () => {
 	// この suite は salary-template の「全体件数（publish + private）」を 3 件、draft を 1 件と
 	// 仮定したアサートを行うため、他 spec が並列で同 post type を作ると件数が崩れる。
-	// describe 内のテストを直列化することで、suite 内の beforeEach → test の順序を保証する。
+	// 直列化して、beforeAll で用意した fixture を各テストが順に使う前提を保つ。
 	test.describe.configure( { mode: 'serial' } );
 
 	// fixture のセットアップに wp-cli を多数呼ぶため、テストごとのタイムアウトを延長する。
 	test.setTimeout( 180000 );
 
-	test.beforeEach( async ( { page } ) => {
+	test.beforeAll( () => {
 		// 既存 fixture を掃除。
 		// salary は bill_copy_post の複製なので fixture meta が引き継がれない。
 		// 一括登録で生成される salary のタイトルは「<staff_title> / <term_name>」になり
 		// PR57_Staff_ から始まる prefix で識別できるため、title prefix でも掃除する。
-		purgePostsByTitlePrefix( 'salary', 'PR57_Staff_' );
-		purgePostFixtures( 'salary' );
-		purgePostFixtures( 'salary-template' );
-		purgePostFixtures( 'salary-staff' );
-		purgeTermFixtures( 'salary-term' );
+		purgeSpecFixtures();
 		// 新規 fixture を投入。
 		setupFixtures();
+	} );
+
+	test.beforeEach( async ( { page } ) => {
+		// データ準備（beforeAll）の時間を各テストのタイムアウトに含めない。
 		await loginAsAdmin( page );
 	} );
 
 	test.afterAll( () => {
-		purgePostsByTitlePrefix( 'salary', 'PR57_Staff_' );
-		purgePostFixtures( 'salary' );
-		purgePostFixtures( 'salary-template' );
-		purgePostFixtures( 'salary-staff' );
-		purgeTermFixtures( 'salary-term' );
+		purgeSpecFixtures();
 	} );
 
 	test( '01: パネル lead 文が「対象テンプレート N 件」表記で、N=publish+private（draft 除外）', async ( {
@@ -306,15 +312,18 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		} );
 
 		// 送信ボタンを押す。
-		// 注: クリック前の URL も `post_type=salary` を含むため、`waitForURL` を後追いで呼ぶと
-		// ナビゲーション完了を待てず素通りする。`waitForNavigation` を `Promise.all` で
-		// クリックと同時に張ってから submit する。
+		// 同じ給与明細一覧 URL へ戻るため、waitForURL では POST 完了を待てない。
 		const submitBtn = page.locator( '#bvsl-bulk-submit' );
 		await expect( submitBtn ).toBeEnabled();
 		await Promise.all( [
-			page.waitForNavigation( { timeout: 30000 } ),
+			page.waitForResponse(
+				( response ) => response.url().includes( '/wp-admin/admin-post.php' ) && response.request().method() === 'POST',
+				{ timeout: 30000 }
+			),
 			submitBtn.click(),
 		] );
+		// リダイレクト先で一括登録の結果通知が描画されるまで待つ。
+		await expect( page.locator( 'div.notice-success' ) ).toBeVisible();
 
 		// publish 2 件 + private 1 件 = 3 件分の salary が draft で生成されているはず。
 		// title prefix で確認する（「PR57_Staff_X / PR57_Term_2026_05」のような形になる想定）。
@@ -334,6 +343,7 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		expect( pr57Drafts.length ).toBe( 3 );
 	} );
 
+	// fixture テンプレートを削除するため、このテストは describe の最後に置く。
 	test( '05: 0 件時のガイダンス - publish/private が 0 件のとき empty 状態 + 通常 lead が出ない', async ( {
 		page,
 	} ) => {
