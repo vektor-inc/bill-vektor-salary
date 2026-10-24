@@ -101,14 +101,29 @@ function trimWpOutput( raw ) {
 // @return {string} 数値の ID。
 function extractWpId( raw, context ) {
 	const id = trimWpOutput( raw )
-		.split( /\s+/ )
-		.find( ( token ) => /^\d+$/.test( token ) );
+		.split( '\n' )
+		.map( ( line ) => line.trim() )
+		.filter( ( line ) => /^\d+$/.test( line ) )
+		.pop();
 
 	if ( ! id ) {
 		throw new Error( `${ context }から数値 ID を取得できませんでした。WP-CLI 出力: ${ raw.trim() }` );
 	}
 
 	return id;
+}
+
+// wp-env の装飾行や PHP notice が混じっても、WP-CLI が返した数値 ID の行だけを取得する。
+// `--format=ids` は複数の ID を空白区切りの1行で返すため、その行全体を検証してから分割する。
+//
+// @param {string} raw - wpCli の生出力。
+// @return {string[]} 数値の ID 一覧。
+function extractWpIds( raw ) {
+	return trimWpOutput( raw )
+		.split( '\n' )
+		.map( ( line ) => line.trim() )
+		.filter( ( line ) => /^\d+(?:\s+\d+)*$/.test( line ) )
+		.flatMap( ( line ) => line.split( /\s+/ ) );
 }
 
 // タイトルが完全一致するスタッフを取得し、存在しなければ fixture として作成する。
@@ -226,12 +241,7 @@ function purgePostFixtures( postType, { metaKey, metaValue } ) {
 		'--format=ids',
 	] );
 	// wp-cli は時々プログレスやチェックマーク行を混ぜるので、ID 列のみ抽出する。
-	const ids = idsRaw
-		.replace( /ℹ.*\n/g, '' )
-		.replace( /✔.*$/m, '' )
-		.trim()
-		.split( /\s+/ )
-		.filter( ( token ) => /^\d+$/.test( token ) );
+	const ids = extractWpIds( idsRaw );
 	if ( ids.length > 0 ) {
 		// IDs はトークンとして個別に渡す（execFileSync ではシェル展開されないため）。
 		wpCli( [ 'post', 'delete', ...ids, '--force' ] );
@@ -275,12 +285,7 @@ function purgeLegacyTitledPosts( postType, titles ) {
 			`--title=${ title }`,
 			'--format=ids',
 		] );
-		const ids = idsRaw
-			.replace( /ℹ.*\n/g, '' )
-			.replace( /✔.*$/m, '' )
-			.trim()
-			.split( /\s+/ )
-			.filter( ( token ) => /^\d+$/.test( token ) );
+		const ids = extractWpIds( idsRaw );
 		if ( ids.length > 0 ) {
 			wpCli( [ 'post', 'delete', ...ids, '--force' ] );
 		}
