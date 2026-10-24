@@ -190,6 +190,15 @@ function setupFixtures() {
 	};
 }
 
+// 本 spec が作る fixture と、複製時に識別 meta が引き継がれない給与明細を掃除する。
+function purgeSpecFixtures() {
+	purgePostsByTitlePrefix( 'salary', 'PR57_Staff_' );
+	purgePostFixtures( 'salary' );
+	purgePostFixtures( 'salary-template' );
+	purgePostFixtures( 'salary-staff' );
+	purgeTermFixtures( 'salary-term' );
+}
+
 // パネルの details を確実に開く。
 async function ensurePanelOpen( page ) {
 	const details = page.locator( 'details.bvsl-bulk-create' ).first();
@@ -203,7 +212,7 @@ async function ensurePanelOpen( page ) {
 test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', () => {
 	// この suite は salary-template の「全体件数（publish + private）」を 3 件、draft を 1 件と
 	// 仮定したアサートを行うため、他 spec が並列で同 post type を作ると件数が崩れる。
-	// describe 内のテストを直列化することで、suite 内の beforeEach → test の順序を保証する。
+	// 直列化して、beforeAll で用意した fixture を各テストが順に使う前提を保つ。
 	test.describe.configure( { mode: 'serial' } );
 
 	// fixture のセットアップに wp-cli を多数呼ぶため、テストごとのタイムアウトを延長する。
@@ -214,26 +223,18 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		// salary は bill_copy_post の複製なので fixture meta が引き継がれない。
 		// 一括登録で生成される salary のタイトルは「<staff_title> / <term_name>」になり
 		// PR57_Staff_ から始まる prefix で識別できるため、title prefix でも掃除する。
-		purgePostsByTitlePrefix( 'salary', 'PR57_Staff_' );
-		purgePostFixtures( 'salary' );
-		purgePostFixtures( 'salary-template' );
-		purgePostFixtures( 'salary-staff' );
-		purgeTermFixtures( 'salary-term' );
+		purgeSpecFixtures();
 		// 新規 fixture を投入。
 		setupFixtures();
 	} );
 
 	test.beforeEach( async ( { page } ) => {
-		// データ準備の時間を各テストのログイン制限に含めない。
+		// データ準備（beforeAll）の時間を各テストのタイムアウトに含めない。
 		await loginAsAdmin( page );
 	} );
 
 	test.afterAll( () => {
-		purgePostsByTitlePrefix( 'salary', 'PR57_Staff_' );
-		purgePostFixtures( 'salary' );
-		purgePostFixtures( 'salary-template' );
-		purgePostFixtures( 'salary-staff' );
-		purgeTermFixtures( 'salary-term' );
+		purgeSpecFixtures();
 	} );
 
 	test( '01: パネル lead 文が「対象テンプレート N 件」表記で、N=publish+private（draft 除外）', async ( {
@@ -311,13 +312,11 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		} );
 
 		// 送信ボタンを押す。
-		// 注: クリック前の URL も `post_type=salary` を含むため、`waitForURL` を後追いで呼ぶと
-		// ナビゲーション完了を待てず素通りする。`waitForNavigation` を `Promise.all` で
-		// クリックと同時に張ってから submit する。
+		// URL 待機をクリックと同時に張り、給与明細一覧へのリダイレクト完了を待つ。
 		const submitBtn = page.locator( '#bvsl-bulk-submit' );
 		await expect( submitBtn ).toBeEnabled();
 		await Promise.all( [
-			page.waitForNavigation( { timeout: 30000 } ),
+			page.waitForURL( /edit\.php\?post_type=salary/, { timeout: 30000 } ),
 			submitBtn.click(),
 		] );
 
@@ -339,6 +338,7 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		expect( pr57Drafts.length ).toBe( 3 );
 	} );
 
+	// fixture テンプレートを削除するため、このテストは describe の最後に置く。
 	test( '05: 0 件時のガイダンス - publish/private が 0 件のとき empty 状態 + 通常 lead が出ない', async ( {
 		page,
 	} ) => {

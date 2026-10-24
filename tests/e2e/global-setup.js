@@ -1,7 +1,7 @@
 const { execFileSync } = require( 'child_process' );
 const { getWpEnvCliContainer } = require( './utils/wp-env' );
 
-// 開発用 wp-env に BillVektor テーマを用意し、サイト言語を ja に切り替える（元に戻さない）。
+// Playwright の接続先と同じ wp-env に BillVektor テーマを用意し、サイト言語を ja に切り替える（元に戻さない）。
 // WordPress コアの日本語表示を、既存環境と空の wp-env の両方で再現する。
 // プラグイン固有の文言は日本語原文であり、追加の言語パックは不要。
 module.exports = () => {

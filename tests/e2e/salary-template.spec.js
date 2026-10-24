@@ -268,6 +268,14 @@ const FIXTURE_SALARY_TITLES = [
 	'麗美テストスタッフB / 2026年6月分',
 ];
 
+// 本 spec の fixture meta または専用タイトルで識別できる投稿を掃除する。
+function purgeSpecFixtures() {
+	purgePostFixtures( 'salary', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
+	purgePostFixtures( 'salary-template', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
+	purgeLegacyTitledPosts( 'salary-template', FIXTURE_TEMPLATE_TITLES );
+	purgeLegacyTitledPosts( 'salary', FIXTURE_SALARY_TITLES );
+}
+
 // 指定した post_type の中から、本 spec 専用タイトルに一致するが fixture meta が付いていない
 // 旧残骸 post を削除する。これは本 spec 自身が過去に作ったが識別子付与前に作られたデータの
 // マイグレーション目的で、他 spec が独自に作るタイトルには影響しない（タイトルが本 spec 専用のため）。
@@ -300,17 +308,8 @@ function purgeLegacyTitledPosts( postType, titles ) {
 //   - 「麗美標準テンプレ（スタッフA向け）」「麗美標準テンプレB（スタッフB向け）」「麗美未設定テンプレ（スタッフ未選択）」を
 //     新規作成し、それぞれ fixture meta と salary_staff メタを設定する。
 function setupTestData( staffIds ) {
-	// 本 spec の fixture meta が付いた salary / salary-template を掃除する。
-	// 他の spec や手動作成データは削除しない（並列実行・マルチ spec 干渉を回避）。
-	purgePostFixtures( 'salary', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
-	purgePostFixtures( 'salary-template', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
-
-	// 本 spec 専用タイトルで作られた fixture meta なしの旧残骸 post も併せて削除。
-	// 旧バージョンの本 spec が作って残っていたデータが test 02 等の同タイトル多重 hit を
-	// 引き起こすのを防ぐ。タイトルは本 spec 専用のため、他 spec への影響なし。
-	purgeLegacyTitledPosts( 'salary-template', FIXTURE_TEMPLATE_TITLES );
-	// 一括登録で生成された給与明細は fixture meta が引き継がれないため、専用タイトルで掃除する。
-	purgeLegacyTitledPosts( 'salary', FIXTURE_SALARY_TITLES );
+	// fixture meta または専用タイトルで識別し、他の spec や手動作成データを残して掃除する。
+	purgeSpecFixtures();
 
 	const { staffA, staffB } = staffIds;
 
@@ -366,10 +365,7 @@ test.beforeAll( () => {
 
 // 繰り返し実行時に、別 spec のテンプレート件数へ本 spec の fixture を混入させない。
 test.afterAll( () => {
-	purgePostFixtures( 'salary', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
-	purgePostFixtures( 'salary-template', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
-	purgeLegacyTitledPosts( 'salary-template', FIXTURE_TEMPLATE_TITLES );
-	purgeLegacyTitledPosts( 'salary', FIXTURE_SALARY_TITLES );
+	purgeSpecFixtures();
 } );
 
 test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様変更後）', () => {

@@ -22,7 +22,7 @@ test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {
 		// 「建設の事業」を選択して保存する。
 		await businessTypeSelect.selectOption( 'construction' );
 		await Promise.all( [
-			page.waitForNavigation(),
+			page.waitForURL( /[?&]settings-updated=true(?:&|$)/ ),
 			page.locator( '#submit' ).click(),
 		] );
 
