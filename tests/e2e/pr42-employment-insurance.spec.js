@@ -1,12 +1,9 @@
 const { test, expect } = require( '@playwright/test' );
+const { login } = require( './utils/login' );
 
 // WordPress管理画面にログインする。
 test.beforeEach( async ( { page } ) => {
-	await page.goto( '/wp-login.php' );
-	await page.locator( '#user_login' ).fill( 'admin' );
-	await page.locator( '#user_pass' ).fill( 'password' );
-	await page.locator( '#wp-submit' ).click();
-	await page.waitForURL( /wp-admin/ );
+	await login( page, 'admin' );
 } );
 
 test.describe( 'PR #42: 令和8年度雇用保険料率対応', () => {

@@ -1,5 +1,6 @@
 const { test, expect } = require( '@playwright/test' );
 const { execFileSync } = require( 'child_process' );
+const { login } = require( './utils/login' );
 
 /**
  * PR #48: 給与テンプレート機能 + 一括登録 機能の e2e テスト（仕様変更後）。
@@ -35,20 +36,12 @@ const FIXTURE_META_VALUE = 'salary-template-spec';
 
 // admin としてログインする共通処理。
 async function loginAsAdmin( page ) {
-	await page.goto( '/wp-login.php' );
-	await page.locator( '#user_login' ).fill( 'admin' );
-	await page.locator( '#user_pass' ).fill( 'password' );
-	await page.locator( '#wp-submit' ).click();
-	await page.waitForURL( /wp-admin/ );
+	await login( page, 'admin' );
 }
 
 // edit_posts のみ持つ salary_editor ロールユーザーとしてログインする。
 async function loginAsSalaryEditor( page ) {
-	await page.goto( '/wp-login.php' );
-	await page.locator( '#user_login' ).fill( 'salary_user' );
-	await page.locator( '#user_pass' ).fill( 'password' );
-	await page.locator( '#wp-submit' ).click();
-	await page.waitForURL( /wp-admin/ );
+	await login( page, 'salary_user' );
 }
 
 // wp-cli を経由して shell コマンドを叩くヘルパ。
@@ -93,6 +86,143 @@ function parseWpJson( raw, fallback ) {
 	}
 }
 
+// wp-env の装飾行を除き、WP-CLI が返した値だけを取得する。
+//
+// @param {string} raw - wpCli の生出力。
+// @return {string} 装飾行を除いた出力。
+function trimWpOutput( raw ) {
+	return raw.replace( /ℹ.*$/gm, '' ).replace( /✔.*$/gm, '' ).trim();
+}
+
+// wp-env の装飾行や PHP notice が混じっても、WP-CLI が返した数値 ID の行だけを取得する。
+//
+// @param {string} raw - wpCli の生出力。
+// @param {string} context - ID を取得した処理の説明。
+// @return {string} 数値の ID。
+function extractWpId( raw, context ) {
+	const id = trimWpOutput( raw )
+		.split( '\n' )
+		.map( ( line ) => line.trim() )
+		.filter( ( line ) => /^\d+$/.test( line ) )
+		.pop();
+
+	if ( ! id ) {
+		throw new Error( `${ context }から数値 ID を取得できませんでした。WP-CLI 出力: ${ raw.trim() }` );
+	}
+
+	return id;
+}
+
+// wp-env の装飾行や PHP notice が混じっても、WP-CLI が返した数値 ID の行だけを取得する。
+// `--format=ids` は複数の ID を空白区切りの1行で返すため、その行全体を検証してから分割する。
+//
+// @param {string} raw - wpCli の生出力。
+// @return {string[]} 数値の ID 一覧。
+function extractWpIds( raw ) {
+	return trimWpOutput( raw )
+		.split( '\n' )
+		.map( ( line ) => line.trim() )
+		.filter( ( line ) => /^\d+(?:\s+\d+)*$/.test( line ) )
+		.flatMap( ( line ) => line.split( /\s+/ ) );
+}
+
+// タイトルが完全一致するスタッフを取得し、存在しなければ fixture として作成する。
+// 前提データは spec 間で共有するため削除せず、作成元を meta で識別可能にして残す。
+//
+// @param {string} title - スタッフ名。
+// @param {string} staffNumber - Staff No.。
+// @return {string} スタッフ投稿 ID。
+function ensureStaff( title, staffNumber ) {
+	const staffPosts = parseWpJson( wpCli( [
+		'post',
+		'list',
+		'--post_type=staff',
+		'--post_status=publish',
+		'--posts_per_page=-1',
+		'--format=json',
+		'--fields=ID,post_title',
+	] ), [] );
+	const existingStaff = staffPosts.find( ( staff ) => staff.post_title === title );
+	if ( existingStaff ) {
+		return String( existingStaff.ID );
+	}
+
+	const staffId = extractWpId( wpCli( [
+		'post',
+		'create',
+		'--post_type=staff',
+		'--post_status=publish',
+		`--post_title=${ title }`,
+		'--porcelain',
+	] ), `スタッフ「${ title }」の作成結果` );
+	wpCli( [ 'post', 'meta', 'update', staffId, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
+	wpCli( [ 'post', 'meta', 'update', staffId, 'salary_staff_number', staffNumber ] );
+	wpCli( [ 'post', 'meta', 'update', staffId, 'salary_staff_status', 'employed' ] );
+	return staffId;
+}
+
+// 名前が完全一致する支給分を取得し、存在しなければ fixture として作成する。
+// 作成したタームには投稿 fixture と同じキー・値の term meta を付けて識別する。
+//
+// @param {string} name - 支給分名。
+// @param {string} slug - 支給分の slug。
+function ensureSalaryTerm( name, slug ) {
+	const terms = parseWpJson( wpCli( [
+		'term',
+		'list',
+		'salary-term',
+		'--format=json',
+		'--fields=term_id,name',
+	] ), [] );
+	if ( terms.some( ( term ) => term.name === name ) ) {
+		return;
+	}
+
+	const termId = extractWpId( wpCli( [
+		'term',
+		'create',
+		'salary-term',
+		name,
+		`--slug=${ slug }`,
+		'--porcelain',
+	] ), `支給分「${ name }」の作成結果` );
+	wpCli( [ 'term', 'meta', 'update', termId, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
+}
+
+// 権限テスト用のロールとユーザーを、空の wp-env でも利用できるように用意する。
+function ensureSalaryEditorUser() {
+	const roles = parseWpJson( wpCli( [ 'role', 'list', '--format=json', '--fields=role' ] ), [] );
+	if ( ! roles.some( ( role ) => role.role === 'salary_editor' ) ) {
+		wpCli( [ 'role', 'create', 'salary_editor', 'Salary Editor' ] );
+	}
+	wpCli( [ 'cap', 'add', 'salary_editor', 'read', 'edit_posts' ] );
+
+	try {
+		wpCli( [ 'user', 'get', 'salary_user', '--field=ID' ] );
+	} catch {
+		wpCli( [
+			'user',
+			'create',
+			'salary_user',
+			'salary-user@example.test',
+			'--role=salary_editor',
+			'--user_pass=password',
+		] );
+	}
+}
+
+// spec 全体で共有する前提データを、最初の1回だけ用意する。
+// 08-a 後のテンプレート再構築では再確認不要なため、setupTestData() から分離する。
+function ensurePrerequisites() {
+	const staffA = ensureStaff( '麗美テストスタッフA', '001' );
+	const staffB = ensureStaff( '麗美テストスタッフB', '002' );
+	ensureStaff( '麗美テストスタッフC', '003' );
+	ensureSalaryTerm( '2026年5月分', '2026-05' );
+	ensureSalaryTerm( '2026年6月分', '2026-06' );
+	ensureSalaryEditorUser();
+	return { staffA, staffB };
+}
+
 // 指定した post_type の中から、fixture meta が一致する投稿のみを削除する。
 // 並列実行や他 spec との干渉を避けるため、テスト spec が作った fixture だけに削除対象を絞る。
 //
@@ -111,12 +241,7 @@ function purgePostFixtures( postType, { metaKey, metaValue } ) {
 		'--format=ids',
 	] );
 	// wp-cli は時々プログレスやチェックマーク行を混ぜるので、ID 列のみ抽出する。
-	const ids = idsRaw
-		.replace( /ℹ.*\n/g, '' )
-		.replace( /✔.*$/m, '' )
-		.trim()
-		.split( /\s+/ )
-		.filter( ( token ) => /^\d+$/.test( token ) );
+	const ids = extractWpIds( idsRaw );
 	if ( ids.length > 0 ) {
 		// IDs はトークンとして個別に渡す（execFileSync ではシェル展開されないため）。
 		wpCli( [ 'post', 'delete', ...ids, '--force' ] );
@@ -131,6 +256,15 @@ const FIXTURE_TEMPLATE_TITLES = [
 	'麗美標準テンプレA',
 	'麗美標準テンプレB',
 	'麗美未設定テンプレ',
+];
+
+// 一括登録処理はテンプレートの fixture meta を複製しないため、生成される給与明細は
+// 本 spec 専用のスタッフ名と支給分を組み合わせたタイトルで識別する。
+const FIXTURE_SALARY_TITLES = [
+	'麗美テストスタッフA / 2026年5月分',
+	'麗美テストスタッフB / 2026年5月分',
+	'麗美テストスタッフA / 2026年6月分',
+	'麗美テストスタッフB / 2026年6月分',
 ];
 
 // 指定した post_type の中から、本 spec 専用タイトルに一致するが fixture meta が付いていない
@@ -151,12 +285,7 @@ function purgeLegacyTitledPosts( postType, titles ) {
 			`--title=${ title }`,
 			'--format=ids',
 		] );
-		const ids = idsRaw
-			.replace( /ℹ.*\n/g, '' )
-			.replace( /✔.*$/m, '' )
-			.trim()
-			.split( /\s+/ )
-			.filter( ( token ) => /^\d+$/.test( token ) );
+		const ids = extractWpIds( idsRaw );
 		if ( ids.length > 0 ) {
 			wpCli( [ 'post', 'delete', ...ids, '--force' ] );
 		}
@@ -169,7 +298,7 @@ function purgeLegacyTitledPosts( postType, titles ) {
 //   - スタッフ A / B / C と salary-term 「2026年5月分」「2026年6月分」は前提として残す。
 //   - 「麗美標準テンプレ（スタッフA向け）」「麗美標準テンプレB（スタッフB向け）」「麗美未設定テンプレ（スタッフ未選択）」を
 //     新規作成し、それぞれ fixture meta と salary_staff メタを設定する。
-function setupTestData() {
+function setupTestData( staffIds ) {
 	// 本 spec の fixture meta が付いた salary / salary-template を掃除する。
 	// 他の spec や手動作成データは削除しない（並列実行・マルチ spec 干渉を回避）。
 	purgePostFixtures( 'salary', { metaKey: FIXTURE_META_KEY, metaValue: FIXTURE_META_VALUE } );
@@ -179,41 +308,20 @@ function setupTestData() {
 	// 旧バージョンの本 spec が作って残っていたデータが test 02 等の同タイトル多重 hit を
 	// 引き起こすのを防ぐ。タイトルは本 spec 専用のため、他 spec への影響なし。
 	purgeLegacyTitledPosts( 'salary-template', FIXTURE_TEMPLATE_TITLES );
+	// 一括登録で生成された給与明細は fixture meta が引き継がれないため、専用タイトルで掃除する。
+	purgeLegacyTitledPosts( 'salary', FIXTURE_SALARY_TITLES );
 
-	// スタッフ A / B の ID を取得（CLI の出力からフィルタ）。
-	function getStaffIdByTitle( title ) {
-		// post list の出力にはアイコン付きのプログレス行が混じるので、ID 行のみ抽出する。
-		const out = wpCli( [
-			'post',
-			'list',
-			'--post_type=staff',
-			'--post_status=publish',
-			'--posts_per_page=-1',
-			'--format=csv',
-			'--fields=ID,post_title',
-		] );
-		const lines = out.split( '\n' );
-		for ( const line of lines ) {
-			// 形式: ID,post_title
-			const cols = line.split( ',' );
-			if ( cols.length >= 2 && cols[ 1 ].includes( title ) ) {
-				return cols[ 0 ];
-			}
-		}
-		return '';
-	}
-	const staffA = getStaffIdByTitle( '麗美テストスタッフA' );
-	const staffB = getStaffIdByTitle( '麗美テストスタッフB' );
+	const { staffA, staffB } = staffIds;
 
 	// 「麗美標準テンプレ（スタッフA）」: スタッフあり。
-	const tplA = wpCli( [
+	const tplA = extractWpId( wpCli( [
 		'post',
 		'create',
 		'--post_type=salary-template',
 		'--post_status=publish',
 		'--post_title=麗美標準テンプレA',
 		'--porcelain',
-	] ).trim();
+	] ), '給与テンプレート「麗美標準テンプレA」の作成結果' );
 	// fixture 識別子を付与（後続の purge 対象に含めるため）。
 	wpCli( [ 'post', 'meta', 'update', tplA, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 	wpCli( [ 'post', 'meta', 'update', tplA, 'salary_staff', staffA ] );
@@ -221,36 +329,38 @@ function setupTestData() {
 	wpCli( [ 'post', 'meta', 'update', tplA, 'salary_base', '300000' ] );
 
 	// 「麗美標準テンプレB（スタッフB）」: スタッフあり。
-	const tplB = wpCli( [
+	const tplB = extractWpId( wpCli( [
 		'post',
 		'create',
 		'--post_type=salary-template',
 		'--post_status=publish',
 		'--post_title=麗美標準テンプレB',
 		'--porcelain',
-	] ).trim();
+	] ), '給与テンプレート「麗美標準テンプレB」の作成結果' );
 	wpCli( [ 'post', 'meta', 'update', tplB, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 	wpCli( [ 'post', 'meta', 'update', tplB, 'salary_staff', staffB ] );
 	wpCli( [ 'post', 'meta', 'update', tplB, 'salary_staff_number', '002' ] );
 	wpCli( [ 'post', 'meta', 'update', tplB, 'salary_base', '280000' ] );
 
 	// 「麗美未設定テンプレ」: スタッフ未設定（salary_staff メタを設定しない）。
-	const tplC = wpCli( [
+	const tplC = extractWpId( wpCli( [
 		'post',
 		'create',
 		'--post_type=salary-template',
 		'--post_status=publish',
 		'--post_title=麗美未設定テンプレ',
 		'--porcelain',
-	] ).trim();
+	] ), '給与テンプレート「麗美未設定テンプレ」の作成結果' );
 	wpCli( [ 'post', 'meta', 'update', tplC, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 
 	return { tplA, tplB };
 }
 
 // テスト全体の前にデータを整える。
+let prerequisiteStaffIds;
 test.beforeAll( () => {
-	setupTestData();
+	prerequisiteStaffIds = ensurePrerequisites();
+	setupTestData( prerequisiteStaffIds );
 } );
 
 test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様変更後）', () => {
@@ -495,7 +605,7 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 			await page.screenshot( { path: 'tests/e2e/screenshots/pr48/08a-no-templates.png', fullPage: true } );
 		} finally {
 			// テンプレを再構築。
-			setupTestData();
+			setupTestData( prerequisiteStaffIds );
 		}
 	} );
 
@@ -527,7 +637,6 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 					name: 'bvsl_e2e_force_no_terms',
 					value: '1',
 					url: baseUrl,
-					path: '/',
 				},
 			] );
 
@@ -562,8 +671,10 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		}
 	} );
 
-	test( '09. 権限: edit_posts のみの salary_editor ではパネルが表示されない', async ( { browser } ) => {
-		const context = await browser.newContext();
+	test( '09. 権限: edit_posts のみの salary_editor ではパネルが表示されない', async ( { browser }, testInfo ) => {
+		const context = await browser.newContext( {
+			baseURL: testInfo.project.use.baseURL,
+		} );
 		const page = await context.newPage();
 		try {
 			await loginAsSalaryEditor( page );
@@ -625,14 +736,14 @@ test.describe.serial( 'PR #48: 給与テンプレートと一括登録（仕様�
 		} );
 		expect( staffId, 'スタッフが 1 件以上登録されている' ).not.toBe( '' );
 
-		const salaryId = wpCli( [
+		const salaryId = extractWpId( wpCli( [
 			'post',
 			'create',
 			'--post_type=salary',
 			'--post_status=draft',
 			'--post_title=デグレ確認用',
 			'--porcelain',
-		] ).trim().split( '\n' ).filter( ( l ) => /^\d+$/.test( l.trim() ) )[ 0 ];
+		] ), '給与明細「デグレ確認用」の作成結果' );
 		// fixture 識別子を付与（後続 spec の purge 対象に含めるため）。
 		wpCli( [ 'post', 'meta', 'update', salaryId, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 		wpCli( [ 'post', 'meta', 'update', salaryId, 'salary_staff', staffId ] );

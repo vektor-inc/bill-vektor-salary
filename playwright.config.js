@@ -2,6 +2,7 @@ const { defineConfig } = require( '@playwright/test' );
 
 module.exports = defineConfig( {
 	testDir: './tests/e2e',
+	globalSetup: require.resolve( './tests/e2e/global-setup' ),
 	timeout: 60000,
 	// 複数 spec が `salary-template` の全体件数（publish/private/draft の合計）を
 	// 前提にアサートしているため、ファイル間の並列実行を避けて衝突を防ぐ。
