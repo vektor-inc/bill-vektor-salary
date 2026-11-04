@@ -4,12 +4,13 @@ module.exports = defineConfig( {
 	testDir: './tests/e2e',
 	globalSetup: require.resolve( './tests/e2e/global-setup' ),
 	timeout: 60000,
-	// 0 件検証は共有 DB のテンプレートを削除するため、通常テスト完了後に実行する。
 	use: {
 		baseURL: process.env.WP_BASE_URL || 'http://localhost:5523',
 		screenshot: 'on',
 		trace: 'on-first-retry',
 	},
+	// 0 件検証は対象テンプレートを一時的に下書きへ変更するため、通常テスト完了後に実行する。
+	// pr57 を単独指定しても依存先の全 spec が走る。並行した DB 操作を避けるため --no-deps は使わない。
 	projects: [
 		{
 			name: 'chromium',
@@ -19,14 +20,14 @@ module.exports = defineConfig( {
 		{
 			name: 'bulk-count',
 			testMatch: '**/pr57-bulk-create-count.spec.js',
-			grepInvert: /05: 0 件時/,
+			grepInvert: /@empty-templates/,
 			dependencies: [ 'chromium' ],
 			use: { browserName: 'chromium' },
 		},
 		{
 			name: 'empty-templates',
 			testMatch: '**/pr57-bulk-create-count.spec.js',
-			grep: /05: 0 件時/,
+			grep: /@empty-templates/,
 			dependencies: [ 'bulk-count' ],
 			use: { browserName: 'chromium' },
 		},

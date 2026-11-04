@@ -219,14 +219,31 @@ function expectFixtureStatuses() {
 	expect( posts.filter( ( post ) => post.post_status === 'draft' ) ).toHaveLength( 1 );
 }
 
-// 0 件検証は最後の project でのみ実行するため、全対象テンプレートを削除できる。
-function purgeAllEligibleTemplates() {
-	const raw = wpCli( [
+// 復元対象は数字の ID と元の publish / private に限定する。
+function listEligibleTemplateStatuses() {
+	const posts = parseWpJson( wpCli( [
 		'post', 'list', '--post_type=salary-template', '--post_status=publish,private',
-		'--posts_per_page=-1', '--format=ids',
-	] );
-	for ( const id of trimWpOut( raw ).split( /\s+/ ).filter( ( value ) => /^\d+$/.test( value ) ) ) {
-		wpCli( [ 'post', 'delete', id, '--force' ] );
+		'--posts_per_page=-1', '--fields=ID,post_status', '--format=json',
+	] ), null );
+	if ( ! Array.isArray( posts ) ) {
+		throw new Error( 'テンプレートの元のステータスを取得できませんでした。' );
+	}
+	return posts.filter( ( post ) => /^\d+$/.test( String( post.ID ) ) &&
+		[ 'publish', 'private' ].includes( post.post_status ) );
+}
+
+// 途中の復元が失敗しても、残りのテンプレートの復元を試みる。
+function restoreTemplateStatuses( posts ) {
+	const errors = [];
+	for ( const post of posts ) {
+		try {
+			wpCli( [ 'post', 'update', String( post.ID ), `--post_status=${ post.post_status }` ] );
+		} catch ( error ) {
+			errors.push( error );
+		}
+	}
+	if ( errors.length ) {
+		throw new AggregateError( errors, 'テンプレートのステータス復元に失敗しました。' );
 	}
 }
 
@@ -241,13 +258,16 @@ async function ensurePanelOpen( page ) {
 }
 
 test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', () => {
-	// fixture を共有するテスト順を維持する。DB 全体を消す 05 は別 project で実行する。
+	// fixture を共有するテスト順を維持する。0 件状態へ変更する 05 は別 project で実行する。
 	test.describe.configure( { mode: 'serial' } );
 
 	// fixture のセットアップに wp-cli を多数呼ぶため、テストごとのタイムアウトを延長する。
 	test.setTimeout( 180000 );
 
-	test.beforeAll( () => {
+	test.beforeAll( ( {}, testInfo ) => {
+		if ( testInfo.project.name !== 'bulk-count' ) {
+			return;
+		}
 		// 既存 fixture を掃除。
 		// salary は bill_copy_post の複製なので fixture meta が引き継がれない。
 		// 一括登録で生成される salary のタイトルは「<staff_title> / <term_name>」になり
@@ -257,13 +277,17 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		setupFixtures();
 	} );
 
-	test.beforeEach( async ( { page } ) => {
+	test.beforeEach( async ( { page }, testInfo ) => {
+		const expectedProject = testInfo.tags.includes( '@empty-templates' ) ? 'empty-templates' : 'bulk-count';
+		test.skip( testInfo.project.name !== expectedProject, `このテストは ${ expectedProject } 専用です。` );
 		// データ準備（beforeAll）の時間を各テストのタイムアウトに含めない。
 		await loginAsAdmin( page );
 	} );
 
-	test.afterAll( () => {
-		purgeSpecFixtures();
+	test.afterAll( ( {}, testInfo ) => {
+		if ( [ 'bulk-count', 'empty-templates' ].includes( testInfo.project.name ) ) {
+			purgeSpecFixtures();
+		}
 	} );
 
 	test( '01: パネル lead 文が「対象テンプレート N 件」表記で、N=publish+private（draft 除外）', async ( {
@@ -376,43 +400,49 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		expect( pr57Drafts.length ).toBe( 3 );
 	} );
 
-	// fixture テンプレートを削除するため、このテストは describe の最後に置く。
-	test( '05: 0 件時のガイダンス - publish/private が 0 件のとき empty 状態 + 通常 lead が出ない', async ( {
+	// タグと project ガードで、共有 DB を一時変更する検証を分離する。
+	test( '05: 0 件時のガイダンス - publish/private が 0 件のとき empty 状態 + 通常 lead が出ない', { tag: '@empty-templates' }, async ( {
 		page,
 	} ) => {
-		// 先行 project の完了後、残存する publish / private も削除して 0 件状態を作る。
-		purgeAllEligibleTemplates();
-		purgePostFixtures( 'salary-template' );
-		const draftId = trimWpOut(
-			wpCli( [
-				'post',
-				'create',
-				'--post_type=salary-template',
-				'--post_title=PR57_OnlyDraft',
-				'--post_status=draft',
-				'--porcelain',
-			] )
-		);
-		wpCli( [ 'post', 'meta', 'update', draftId, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
+		const originalStatuses = listEligibleTemplateStatuses();
+		try {
+			// 変更途中や画面の検証で失敗しても finally で元に戻す。
+			for ( const post of originalStatuses ) {
+				wpCli( [ 'post', 'update', String( post.ID ), '--post_status=draft' ] );
+			}
+			const draftId = trimWpOut(
+				wpCli( [
+					'post',
+					'create',
+					'--post_type=salary-template',
+					'--post_title=PR57_OnlyDraft',
+					'--post_status=draft',
+					'--porcelain',
+				] )
+			);
+			wpCli( [ 'post', 'meta', 'update', draftId, FIXTURE_META_KEY, FIXTURE_META_VALUE ] );
 
-		await page.goto( '/wp-admin/edit.php?post_type=salary' );
-		await ensurePanelOpen( page );
+			await page.goto( '/wp-admin/edit.php?post_type=salary' );
+			await ensurePanelOpen( page );
 
-		// 0 件のとき empty 案内が出る（form 自体は描画されない）。
-		const emptyHint = page.locator(
-			'details.bvsl-bulk-create p',
-			{ hasText: '給与テンプレートがまだ登録されていません' }
-		);
-		await expect( emptyHint ).toBeVisible();
+			// 0 件のとき empty 案内が出る（form 自体は描画されない）。
+			const emptyHint = page.locator(
+				'details.bvsl-bulk-create p',
+				{ hasText: '給与テンプレートがまだ登録されていません' }
+			);
+			await expect( emptyHint ).toBeVisible();
 
-		// 通常 lead は描画されない。
-		const lead = page.locator( '.bvsl-bulk-create__lead' );
-		await expect( lead ).toHaveCount( 0 );
+			// 通常 lead は描画されない。
+			const lead = page.locator( '.bvsl-bulk-create__lead' );
+			await expect( lead ).toHaveCount( 0 );
 
-		// localize 値も 0。
-		const data = await page.evaluate( () => window.bvslBulkCreatePanel || null );
-		expect( data ).not.toBeNull();
-		// wp_localize_script はスカラを文字列化するため Number キャスト後に比較。
-		expect( Number( data.templateCount ) ).toBe( 0 );
+			// localize 値も 0。
+			const data = await page.evaluate( () => window.bvslBulkCreatePanel || null );
+			expect( data ).not.toBeNull();
+			// wp_localize_script はスカラを文字列化するため Number キャスト後に比較。
+			expect( Number( data.templateCount ) ).toBe( 0 );
+		} finally {
+			restoreTemplateStatuses( originalStatuses );
+		}
 	} );
 } );
