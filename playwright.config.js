@@ -11,6 +11,7 @@ module.exports = defineConfig( {
 	},
 	// 0 件検証は対象テンプレートを一時的に下書きへ変更するため、通常テスト完了後に実行する。
 	// pr57 を単独指定しても依存先の全 spec が走る。並行した DB 操作を避けるため --no-deps は使わない。
+	// chromium が1件でも失敗すると bulk-count と empty-templates は連鎖スキップされるが、失敗は全体の失敗として表示されるので見落とさない。
 	projects: [
 		{
 			name: 'chromium',

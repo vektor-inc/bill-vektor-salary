@@ -18,6 +18,7 @@ const { getWpEnvCliContainer } = require( './utils/wp-env' );
  * 並列実行・他 spec との干渉を避けるため、本 spec 専用の fixture meta を付ける。
  */
 
+const ORIGINAL_STATUS_META_KEY = '_e2e_pr57_original_status';
 const FIXTURE_META_KEY = '_e2e_fixture_pr57';
 const FIXTURE_META_VALUE = 'pr57-bulk-create-count-spec';
 
@@ -232,12 +233,34 @@ function listEligibleTemplateStatuses() {
 		[ 'publish', 'private' ].includes( post.post_status ) );
 }
 
+// 中断時に残った目印を取得し、fixture の掃除や件数確認より先に復旧する。
+function recoverTemplateStatuses() {
+	const posts = parseWpJson( wpCli( [
+		'post', 'list', '--post_type=salary-template', '--post_status=any',
+		'--posts_per_page=-1', `--meta_key=${ ORIGINAL_STATUS_META_KEY }`,
+		'--fields=ID', '--format=json',
+	] ), null );
+	if ( ! Array.isArray( posts ) ) {
+		throw new Error( 'テンプレートの復旧対象を取得できませんでした。' );
+	}
+	const originalStatuses = posts.map( ( post ) => {
+		const status = trimWpOut( wpCli( [ 'post', 'meta', 'get', String( post.ID ), ORIGINAL_STATUS_META_KEY ] ) );
+		if ( ! /^\d+$/.test( String( post.ID ) ) || ! [ 'publish', 'private' ].includes( status ) ) {
+			throw new Error( 'テンプレートの復旧用ステータスが不正です。' );
+		}
+		return { ID: post.ID, post_status: status };
+	} );
+	restoreTemplateStatuses( originalStatuses );
+}
+
 // 途中の復元が失敗しても、残りのテンプレートの復元を試みる。
 function restoreTemplateStatuses( posts ) {
 	const errors = [];
 	for ( const post of posts ) {
 		try {
 			wpCli( [ 'post', 'update', String( post.ID ), `--post_status=${ post.post_status }` ] );
+			// 復元が成功した投稿だけ目印を消し、失敗した投稿は次回に再試行する。
+			wpCli( [ 'post', 'meta', 'delete', String( post.ID ), ORIGINAL_STATUS_META_KEY ] );
 		} catch ( error ) {
 			errors.push( error );
 		}
@@ -265,6 +288,7 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 	test.setTimeout( 180000 );
 
 	test.beforeAll( ( {}, testInfo ) => {
+		recoverTemplateStatuses();
 		if ( testInfo.project.name !== 'bulk-count' ) {
 			return;
 		}
@@ -404,10 +428,13 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 	test( '05: 0 件時のガイダンス - publish/private が 0 件のとき empty 状態 + 通常 lead が出ない', { tag: '@empty-templates' }, async ( {
 		page,
 	} ) => {
+		recoverTemplateStatuses();
 		const originalStatuses = listEligibleTemplateStatuses();
 		try {
 			// 変更途中や画面の検証で失敗しても finally で元に戻す。
 			for ( const post of originalStatuses ) {
+				// 強制終了でも元の状態を失わないよう、変更前に保存する。
+				wpCli( [ 'post', 'meta', 'update', String( post.ID ), ORIGINAL_STATUS_META_KEY, post.post_status ] );
 				wpCli( [ 'post', 'update', String( post.ID ), '--post_status=draft' ] );
 			}
 			const draftId = trimWpOut(
@@ -442,7 +469,7 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 			// wp_localize_script はスカラを文字列化するため Number キャスト後に比較。
 			expect( Number( data.templateCount ) ).toBe( 0 );
 		} finally {
-			restoreTemplateStatuses( originalStatuses );
+			recoverTemplateStatuses();
 		}
 	} );
 } );
