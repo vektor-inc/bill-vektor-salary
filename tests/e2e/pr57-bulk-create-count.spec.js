@@ -199,6 +199,37 @@ function purgeSpecFixtures() {
 	purgeTermFixtures( 'salary-term' );
 }
 
+// DB 全体の publish / private 件数を、画面を開く直前の期待値として取得する。
+function countEligibleTemplates() {
+	const raw = wpCli( [
+		'post', 'list', '--post_type=salary-template',
+		'--post_status=publish,private', '--posts_per_page=-1', '--format=ids',
+	] );
+	return trimWpOut( raw ).split( /\s+/ ).filter( ( id ) => /^\d+$/.test( id ) ).length;
+}
+
+// 自分の draft は件数へ入らず、publish / private の 3 件だけが入ることを確認する。
+function expectFixtureStatuses() {
+	const posts = parseWpJson( wpCli( [
+		'post', 'list', '--post_type=salary-template', '--post_status=any',
+		'--posts_per_page=-1', `--meta_key=${ FIXTURE_META_KEY }`,
+		`--meta_value=${ FIXTURE_META_VALUE }`, '--fields=ID,post_status', '--format=json',
+	] ), [] );
+	expect( posts.filter( ( post ) => [ 'publish', 'private' ].includes( post.post_status ) ) ).toHaveLength( 3 );
+	expect( posts.filter( ( post ) => post.post_status === 'draft' ) ).toHaveLength( 1 );
+}
+
+// 0 件検証は最後の project でのみ実行するため、全対象テンプレートを削除できる。
+function purgeAllEligibleTemplates() {
+	const raw = wpCli( [
+		'post', 'list', '--post_type=salary-template', '--post_status=publish,private',
+		'--posts_per_page=-1', '--format=ids',
+	] );
+	for ( const id of trimWpOut( raw ).split( /\s+/ ).filter( ( value ) => /^\d+$/.test( value ) ) ) {
+		wpCli( [ 'post', 'delete', id, '--force' ] );
+	}
+}
+
 // パネルの details を確実に開く。
 async function ensurePanelOpen( page ) {
 	const details = page.locator( 'details.bvsl-bulk-create' ).first();
@@ -210,9 +241,7 @@ async function ensurePanelOpen( page ) {
 }
 
 test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', () => {
-	// この suite は salary-template の「全体件数（publish + private）」を 3 件、draft を 1 件と
-	// 仮定したアサートを行うため、他 spec が並列で同 post type を作ると件数が崩れる。
-	// 直列化して、beforeAll で用意した fixture を各テストが順に使う前提を保つ。
+	// fixture を共有するテスト順を維持する。DB 全体を消す 05 は別 project で実行する。
 	test.describe.configure( { mode: 'serial' } );
 
 	// fixture のセットアップに wp-cli を多数呼ぶため、テストごとのタイムアウトを延長する。
@@ -240,6 +269,7 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 	test( '01: パネル lead 文が「対象テンプレート N 件」表記で、N=publish+private（draft 除外）', async ( {
 		page,
 	} ) => {
+		const expectedCount = countEligibleTemplates();
 		await page.goto( '/wp-admin/edit.php?post_type=salary' );
 		await ensurePanelOpen( page );
 
@@ -253,8 +283,9 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		expect( match ).not.toBeNull();
 		const count = Number( match[ 1 ] );
 
-		// fixture では publish 2 件 + private 1 件 = 3 件、draft 1 件は除外。
-		expect( count ).toBe( 3 );
+		// DB の現在件数と照合し、自分の draft が除外されることも確認する。
+		expect( count ).toBe( expectedCount );
+		expectFixtureStatuses();
 
 		// 文言が新表記であること（PR #57 で変更）。
 		expect( leadText ).toContain( '一括展開の対象となる給与テンプレート' );
@@ -264,12 +295,13 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 	} );
 
 	test( '02: localize された templateCount と i18n 文言が新表記', async ( { page } ) => {
+		const expectedCount = countEligibleTemplates();
 		await page.goto( '/wp-admin/edit.php?post_type=salary' );
 		// localize 値はページ読み込み時点で window.bvslBulkCreatePanel に入る。
 		const data = await page.evaluate( () => window.bvslBulkCreatePanel || null );
 		expect( data ).not.toBeNull();
 		// wp_localize_script はスカラ値を文字列化する仕様のため、Number キャストして比較する。
-		expect( Number( data.templateCount ) ).toBe( 3 );
+		expect( Number( data.templateCount ) ).toBe( expectedCount );
 
 		expect( data.i18n.summary ).toContain( '対象テンプレート' );
 		expect( data.i18n.summary ).not.toContain( '公開中のテンプレート' );
@@ -277,9 +309,10 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		expect( data.i18n.confirm ).not.toContain( '公開中のテンプレート' );
 	} );
 
-	test( '03: 件数プレビュー（送信前 summary）が「対象テンプレート 3 件」を表示', async ( {
+	test( '03: 件数プレビュー（送信前 summary）が DB の対象テンプレート件数を表示', async ( {
 		page,
 	} ) => {
+		const expectedCount = countEligibleTemplates();
 		await page.goto( '/wp-admin/edit.php?post_type=salary' );
 		await ensurePanelOpen( page );
 
@@ -288,9 +321,9 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 		await expect( termSelect ).toBeVisible();
 		await termSelect.selectOption( { label: 'PR57_Term_2026_05' } );
 
-		// JS が描画する summary 領域に「対象テンプレート 3 件」が出る。
+		// JS が描画する summary 領域に現在の件数が出る。
 		const summaryText = page.locator( '#bvsl-bulk-summary' );
-		await expect( summaryText ).toContainText( /対象テンプレート\s*3\s*件/, {
+		await expect( summaryText ).toContainText( new RegExp( `対象テンプレート\\s*${ expectedCount }\\s*件` ), {
 			timeout: 5000,
 		} );
 		// 旧表記が出ていないこと。
@@ -347,7 +380,8 @@ test.describe( 'PR #57: 一括登録パネル件数取得 + 文言中立化', ()
 	test( '05: 0 件時のガイダンス - publish/private が 0 件のとき empty 状態 + 通常 lead が出ない', async ( {
 		page,
 	} ) => {
-		// fixture テンプレを全消去 → draft のみのテンプレを 1 件だけ作って 0 件状態を作る。
+		// 先行 project の完了後、残存する publish / private も削除して 0 件状態を作る。
+		purgeAllEligibleTemplates();
 		purgePostFixtures( 'salary-template' );
 		const draftId = trimWpOut(
 			wpCli( [

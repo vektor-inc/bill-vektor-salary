@@ -4,10 +4,7 @@ module.exports = defineConfig( {
 	testDir: './tests/e2e',
 	globalSetup: require.resolve( './tests/e2e/global-setup' ),
 	timeout: 60000,
-	// 複数 spec が `salary-template` の全体件数（publish/private/draft の合計）を
-	// 前提にアサートしているため、ファイル間の並列実行を避けて衝突を防ぐ。
-	// spec ごとの project 分離など根本的なテスト隔離設計は別 issue で対応予定。
-	workers: 1,
+	// 0 件検証は共有 DB のテンプレートを削除するため、通常テスト完了後に実行する。
 	use: {
 		baseURL: process.env.WP_BASE_URL || 'http://localhost:5523',
 		screenshot: 'on',
@@ -16,6 +13,21 @@ module.exports = defineConfig( {
 	projects: [
 		{
 			name: 'chromium',
+			testIgnore: '**/pr57-bulk-create-count.spec.js',
+			use: { browserName: 'chromium' },
+		},
+		{
+			name: 'bulk-count',
+			testMatch: '**/pr57-bulk-create-count.spec.js',
+			grepInvert: /05: 0 件時/,
+			dependencies: [ 'chromium' ],
+			use: { browserName: 'chromium' },
+		},
+		{
+			name: 'empty-templates',
+			testMatch: '**/pr57-bulk-create-count.spec.js',
+			grep: /05: 0 件時/,
+			dependencies: [ 'bulk-count' ],
 			use: { browserName: 'chromium' },
 		},
 	],
