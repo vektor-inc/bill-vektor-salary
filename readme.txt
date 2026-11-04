@@ -19,6 +19,7 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 * [ 仕様変更 ] plugin-update-checker を 5.6 から 5.7 にアップデート
 * [ 開発環境 ] 開発・CI で使う Node.js を 24.22.1 以上に更新
 * [ 開発環境 ] Node.js のバージョン指定を `.node-version` に一本化し、package.json の Volta 用の指定を削除
+* [ 開発環境 ] e2e テストで前回の残りデータや並列実行によりテンプレート件数の確認が失敗する不具合を修正し、テストの並列実行を有効化
 
 = 0.13.0 =
 * [ 機能追加 ] 一括登録パネルで対象とする支給分タームを絞り込む拡張ポイント `bvsl_bulk_create_panel_terms` フィルターを追加
