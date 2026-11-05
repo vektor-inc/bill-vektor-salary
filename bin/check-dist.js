@@ -16,6 +16,10 @@ const entries = execFileSync('unzip', ['-Z1', path.join(root, 'dist', `${pluginN
 const archiveFiles = new Set(entries.filter((entry) => !entry.endsWith('/')));
 for (const entry of entries) {
 	assert.ok(entry.startsWith(`${pluginName}/`), `zip のルートが不正: ${entry}`);
+	assert.ok(!entry.slice(pluginName.length + 1).startsWith('.'), `zip にルート隠しファイル・ディレクトリ: ${entry}`);
+}
+for (const entry of fs.readdirSync(dist)) {
+	assert.ok(!entry.startsWith('.'), `配布先にルート隠しファイル・ディレクトリ: ${entry}`);
 }
 for (const name of ['tests', 'node_modules', '.github', 'bin']) {
 	assert.ok(!fs.existsSync(path.join(dist, name)), `配布対象外: ${name}`);
