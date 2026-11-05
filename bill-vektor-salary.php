@@ -38,6 +38,8 @@ $myUpdateChecker = Puc_v4_Factory::buildUpdateChecker(
 	'bill-vektor-salary'
 );
 $myUpdateChecker->setBranch( 'master' );
+// PDF 発行に必要なライブラリを含む配布用 zip で更新する。
+$myUpdateChecker->getVcsApi()->enableReleaseAssets( '/^bill-vektor-salary\.zip$/' );
 
 /*
 	給与明細編集画面：管理画面用スクリプトの読み込み

@@ -2,7 +2,7 @@ name: Deploy
 on:
     push:
         tags:
-            - '[0-9]+.[0-9]+.[0-9]+.[0-9]'
+            - '[0-9]+.[0-9]+.[0-9]+'
 
 env:
     plugin_name: bill-vektor-salary
@@ -88,19 +88,14 @@ jobs:
                   php-version: 8.1
             - name: Install NPM Scripts
               run: npm install
-            - name: Install Composer Packages
-              run: composer install
             - name: Install WP-CLI
               run: |
                   curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
                   chmod +x wp-cli.phar
                   mv wp-cli.phar /usr/local/bin/wp
             - name: Make Distribution
-              # "npm run dist" の中で composer install --no-dev & npx gulp dist してるが、毎回「ちゃんと --no-dev 処理されてるのか？」と心配になるので直書きに変更
-              run: |
-                  composer install --no-dev
-                  npx gulp dist
-                  cd dist/ && zip -r ${{ env.plugin_name }}.zip ${{ env.plugin_name }}/ && mv ${{ env.plugin_name }}.zip ${GITHUB_WORKSPACE}
+              # 本番依存のインストールから zip の検証まで同じ手順で実行する。
+              run: npm run dist
             - name: Create GitHub Release
               id: create_release
               uses: actions/create-release@v1
@@ -118,6 +113,6 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ${{ env.plugin_name }}.zip
+                  asset_path: dist/${{ env.plugin_name }}.zip
                   asset_name: ${{ env.plugin_name }}.zip
                   asset_content_type: application/zip

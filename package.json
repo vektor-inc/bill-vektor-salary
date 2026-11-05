@@ -5,7 +5,8 @@
 	"author": "Vektor,Inc.",
 	"scripts": {
 		"wp-env": "wp-env",
-		"dist": "rimraf ./dist/ && npx gulp dist && cd dist && zip -r bill-vektor-salary.zip bill-vektor-salary",
+		"dist": "composer install --no-dev --no-interaction --prefer-dist && node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && gulp dist && cd dist && zip -qr bill-vektor-salary.zip bill-vektor-salary && node ../bin/check-dist.js",
+		"test:dist": "node bin/check-dist.js",
 		"phpunit": "wp-env run tests-cli --env-cwd='wp-content/plugins/bill-vektor-salary' vendor/bin/phpunit -c .phpunit.xml --verbose"
 	},
 	"devDependencies": {
