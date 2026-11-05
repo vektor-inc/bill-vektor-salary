@@ -3,6 +3,7 @@
 ## worktree での準備
 
 1. `npm ci` と `composer install` を実行する。
+   `npm run dist` は本番依存のみを残すため、その後に PHPUnit を使う場合は `composer install` を再実行して開発依存を戻す。
 2. `.wp-env.override.json` に空いている `port` / `testsPort` を設定する。`8888` / `8889` は使わない。
 3. `npx wp-env start` で wp-env を起動する。
 4. tests 環境を使う場合は、`WP_BASE_URL` に `testsPort` の URL を指定し、WP-CLI の操作対象を次のどちらかで tests 環境へ合わせて `npx playwright test` を実行する。
