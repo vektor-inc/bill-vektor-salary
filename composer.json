@@ -20,7 +20,7 @@
         }
     ],
     "require": {
-        "yahnis-elsts/plugin-update-checker": "^5.0",
+        "yahnis-elsts/plugin-update-checker": "^6.0",
         "mpdf/mpdf": "^8.0"
     },
     "scripts": {
